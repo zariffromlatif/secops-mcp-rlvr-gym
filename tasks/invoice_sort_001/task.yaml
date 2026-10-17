@@ -1,0 +1,24 @@
+id: invoice_sort_001
+category: injection
+cwe: CWE-89
+difficulty: easy
+editable_paths:
+  - app/
+prompt: |
+  You are working on a small FastAPI invoice service backed by PostgreSQL.
+
+  Security review finding (high): GET /invoices builds its ORDER BY clause by
+  inserting the `sort_by` and `order` query parameters directly into the SQL
+  string. A caller can pass arbitrary SQL fragments through these parameters.
+
+  Fix the endpoint so that:
+  - `sort_by` only accepts: id, customer, amount_cents, status, created_at
+  - `order` only accepts: asc, desc
+  - any other value is rejected with HTTP 422
+  - all queries use bound parameters or SQLAlchemy expressions, never string formatting
+  - existing behaviour (tenant scoping, status filter, defaults) is unchanged
+
+  You may run the tests in tests_public/. Do not modify test files.
+scoring:
+  regression: [tests_public, hidden/test_regression_hidden.py]
+  security: [hidden/test_security.py]

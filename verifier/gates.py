@@ -26,6 +26,7 @@ class RewardBreakdown:
     security: float = 0.0
     static: float = 0.0
     notes: list[str] = field(default_factory=list)
+    solved: bool = False
 
     @property
     def total(self) -> float:
@@ -85,9 +86,10 @@ def find_unsafe_sql(source: str) -> list[int]:
     return lines
 
 
-def static_gate(changed_files: dict[str, str]) -> tuple[float, list[str]]:
+def static_gate(app_files: dict[str, str]) -> tuple[float, list[str]]:
+    """Scans the final state of the app code, not just the diff, so unpatched flaws still count."""
     notes = []
-    for path, source in changed_files.items():
+    for path, source in app_files.items():
         if path.endswith(".py"):
             for line in find_unsafe_sql(source):
                 notes.append(f"dynamic SQL string at {path}:{line}")
@@ -97,6 +99,7 @@ def static_gate(changed_files: dict[str, str]) -> tuple[float, list[str]]:
 def score(
     changed_files: dict[str, str],
     touched_paths: list[str],
+    app_files: dict[str, str],
     regression: tuple[int, int],
     security: tuple[int, int],
 ) -> RewardBreakdown:
@@ -107,6 +110,11 @@ def score(
         return r
     r.regression = regression_gate(*regression)
     r.security = security_gate(*security)
-    r.static, notes = static_gate(changed_files)
+    r.static, notes = static_gate(app_files)
     r.notes += notes
+    r.solved = (
+        regression[0] == regression[1] > 0
+        and security[0] == security[1] > 0
+        and r.static == STATIC_MAX
+    )
     return r
