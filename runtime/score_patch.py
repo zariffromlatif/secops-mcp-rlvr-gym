@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 from verifier.gates import RewardBreakdown, score  # noqa: E402
 
 AGENT_VISIBLE = ["app", "tests_public", "seed.sql"]
+TMP_ROOT = ROOT / ".tmp"  # keep scratch copies on the repo drive, not %TEMP%
 
 
 def prepare_workdir(task_dir: Path, workdir: Path) -> None:
@@ -87,7 +88,8 @@ def read_py(workdir: Path, paths) -> dict[str, str]:
 def score_patch(task_dir: Path, patch: Path) -> RewardBreakdown:
     task_dir, patch = task_dir.resolve(), patch.resolve()
     spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
-    with tempfile.TemporaryDirectory(prefix="gym-") as tmp:
+    TMP_ROOT.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="gym-", dir=TMP_ROOT) as tmp:
         workdir = Path(tmp)
         prepare_workdir(task_dir, workdir)
 
