@@ -9,7 +9,13 @@ reward cannot be gamed by editing tests or special-casing inputs.
 
 ## Status
 
-1 task (`invoice_sort_001`). Gold patch scores 1.00, no-op patch 0.33 (unsolved).
+3 tasks, all validated (gold solved at 1.00, no-op unsolved with zero security score):
+
+| Task | Flaw | CWE |
+|---|---|---|
+| `invoice_sort_001` | ORDER BY built from raw query params | CWE-89 |
+| `invoice_tenant_002` | Invoices readable/editable across tenants | CWE-639 |
+| `report_auth_003` | Export endpoint skips authentication | CWE-306 |
 
 ## Layout
 

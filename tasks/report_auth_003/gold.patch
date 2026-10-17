@@ -1,0 +1,21 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -21,15 +21,15 @@
+ 
+ # Added for the finance team's nightly export job.
+ @app.get("/reports/export")
+-def export(tenant_id: int, db=Depends(get_db)):
++def export(tenant: int = Depends(require_tenant), db=Depends(get_db)):
+     rows = db.execute(
+         text(
+             "SELECT id, customer, amount_cents, status, created_at "
+             "FROM invoices WHERE tenant_id = :tenant ORDER BY id"
+         ),
+-        {"tenant": tenant_id},
++        {"tenant": tenant},
+     ).mappings().all()
+     return {
+-        "tenant_id": tenant_id,
++        "tenant_id": tenant,
+         "invoices": [{**r, "created_at": r["created_at"].isoformat()} for r in rows],
+     }
