@@ -19,7 +19,7 @@ from secops_gym_patches._vendor import gates
 PKG = Path(__file__).resolve().parent
 TASKS = PKG / "data" / "tasks"
 BOX = "/opt/gym"
-DEFAULT_IMAGE = "secops-gym-task:0.1"
+DEFAULT_IMAGE = "ghcr.io/zariffromlatif/secops-gym-task:0.1"
 
 INSTRUCTIONS = """
 

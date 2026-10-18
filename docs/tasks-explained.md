@@ -9,17 +9,17 @@ automatically. A model (or a person) gets the code and a bug report, and must pr
 
 ```
 tasks/<task_id>/
-â”œâ”€â”€ app/            the service the model can read and edit
-â”‚   â”œâ”€â”€ db.py         database connection (same in every task)
-â”‚   â””â”€â”€ main.py       the API endpoints, contains the bug
-â”œâ”€â”€ tests_public/   tests the model may run (normal behaviour)
-â”œâ”€â”€ hidden/         tests the model never sees
-â”‚   â”œâ”€â”€ test_regression_hidden.py   more normal-behaviour checks
-â”‚   â””â”€â”€ test_target.py / test_security.py   checks that only pass if the bug is fixed
-â”œâ”€â”€ seed.sql        the exact database contents for every test run
-â”œâ”€â”€ gold.patch      the correct fix (proves the task is solvable)
-â”œâ”€â”€ noop.patch      an empty change (proves the hidden tests catch the bug)
-â””â”€â”€ task.yaml       the bug report shown to the model, and which tests count for what
+├── app/            the service the model can read and edit
+│   ├── db.py         database connection (same in every task)
+│   └── main.py       the API endpoints, contains the bug
+├── tests_public/   tests the model may run (normal behaviour)
+├── hidden/         tests the model never sees
+│   ├── test_regression_hidden.py   more normal-behaviour checks
+│   └── test_target.py / test_security.py   checks that only pass if the bug is fixed
+├── seed.sql        the exact database contents for every test run
+├── gold.patch      the correct fix (proves the task is solvable)
+├── noop.patch      an empty change (proves the hidden tests catch the bug)
+└── task.yaml       the bug report shown to the model, and which tests count for what
 ```
 
 ### How a patch is scored
@@ -74,7 +74,7 @@ last page) are where bugs live.
 **The bug:** every payer gets `amount // payers`. 10000 cents / 3 = 3333 each, which adds up to
 9999. One cent disappears, and in real finance systems that breaks reconciliation.
 
-**The fix:** `divmod(amount, payers)` gives both the base share and the remainder (10000 â†’ 3333,
+**The fix:** `divmod(amount, payers)` gives both the base share and the remainder (10000 → 3333,
 remainder 1). The first `remainder` payers get one extra cent: `[3334, 3333, 3333]`.
 
 **How the tests catch it:** they check that shares **sum to the total**, differ by at most
@@ -185,7 +185,7 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
 1. **Copy a similar task:** `cp -r tasks/orders_pagination_004 tasks/my_task_008`, then rename
    the `id` in `task.yaml`.
 2. **Change the story:** a different domain (clinic appointments, bus tickets, library loans) and
-   1â€“2 endpoints. Keep it small.
+   1–2 endpoints. Keep it small.
 3. **Write the correct `app/main.py`.** Save a copy as `gold_main.py` outside `tasks/`.
 4. **Write tests against the correct version:**
    - `tests_public/`: normal behaviour that also works with the bug present
@@ -216,4 +216,4 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
 5. **git and diff:** create and apply a patch by hand once.
 6. **Security:** PortSwigger Web Security Academy, the free labs.
 
-At 1â€“2 hours a day, steps 1â€“4 take about 2â€“3 weeks. Read one task folder alongside each step.
+At 1–2 hours a day, steps 1–4 take about 2–3 weeks. Read one task folder alongside each step.

@@ -115,8 +115,8 @@ uv run vf-validate secops_gym_workflows --runtime.type subprocess
 
 On Windows, run the same commands inside the Linux devbox: `sh scripts/devbox.sh uv run --no-sync vf-validate ...`.
 
-Publishing: run the **publish-task-image** GitHub Action (pushes `ghcr.io/<owner>/secops-gym-task`),
-make that package public on GitHub, then push each environment from its folder with the
+Publishing: the task image is public at `ghcr.io/zariffromlatif/secops-gym-task:0.1` (rebuild it
+with the **publish-task-image** GitHub Action). Push each environment from its folder with the
 `prime` CLI (`prime login`, then `prime env push`).
 
 ## Sandbox

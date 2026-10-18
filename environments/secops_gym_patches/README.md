@@ -30,12 +30,12 @@ no untouched task passes (untouched rewards are 0.33–0.50, from regression cre
 ## Run
 
 ```bash
-# build the task image (or pass --env.taskset.image <registry tag>)
+# the default image ghcr.io/zariffromlatif/secops-gym-task:0.1 is public; or build it locally:
 sh scripts/build_task_image.sh
 uv run vf-validate secops_gym_patches --runtime.type docker
 uv run vf-eval secops_gym_patches --runtime.type docker -n 7 --model <model>
 ```
 
-Options: `--env.taskset.categories '["security"]'`, `--env.taskset.image ghcr.io/<you>/secops-gym-task:0.1`.
+Options: `--env.taskset.categories '["security"]'`, `--env.taskset.image <another tag>`.
 
 Source and task authoring guide: https://github.com/zariffromlatif/secops-mcp-rlvr-gym
