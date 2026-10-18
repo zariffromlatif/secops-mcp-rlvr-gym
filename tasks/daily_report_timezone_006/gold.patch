@@ -1,0 +1,21 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -19,11 +19,16 @@
+ @app.get("/reports/daily")
+ def daily_report(day: date, tz: str = "UTC", db=Depends(get_db)):
+     zone = parse_zone(tz)
++    start = datetime.combine(day, time.min, tzinfo=zone)
++    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone)
+     row = db.execute(
+         text(
+             "SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents), 0) AS total_cents "
+-            "FROM invoices WHERE created_at::date = :day"
++            "FROM invoices WHERE created_at >= :start AND created_at < :end"
+         ),
+-        {"day": day},
++        {
++            "start": start.astimezone(timezone.utc).replace(tzinfo=None),
++            "end": end.astimezone(timezone.utc).replace(tzinfo=None),
++        },
+     ).mappings().one()
+     return {"day": day.isoformat(), "tz": tz, **row}

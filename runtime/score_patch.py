@@ -86,6 +86,8 @@ def read_py(workdir: Path, paths) -> dict[str, str]:
 def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBreakdown:
     task_dir, patch = task_dir.resolve(), patch.resolve()
     spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
+    # Bug-fix tasks name their task-specific hidden checks `target`; security tasks use `security`.
+    spec["security"] = spec.get("security") or spec["target"]
     TMP_ROOT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="gym-", dir=TMP_ROOT) as tmp:
         workdir = Path(tmp)

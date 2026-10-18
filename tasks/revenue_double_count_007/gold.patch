@@ -1,0 +1,15 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -11,9 +11,10 @@
+     """Revenue per customer: paid invoices that have at least one recorded payment."""
+     rows = db.execute(
+         text(
+-            "SELECT i.customer, COUNT(i.id) AS invoices, SUM(i.amount_cents) AS revenue_cents "
+-            "FROM invoices i JOIN payments p ON p.invoice_id = i.id "
++            "SELECT i.customer, COUNT(*) AS invoices, SUM(i.amount_cents) AS revenue_cents "
++            "FROM invoices i "
+             "WHERE i.status = 'paid' "
++            "AND EXISTS (SELECT 1 FROM payments p WHERE p.invoice_id = i.id) "
+             "GROUP BY i.customer ORDER BY i.customer"
+         )
+     ).mappings().all()

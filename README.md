@@ -9,13 +9,21 @@ reward cannot be gamed by editing tests or special-casing inputs.
 
 ## Status
 
-3 tasks, all validated (gold solved at 1.00, no-op unsolved with zero security score):
+7 tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
+target score, identical scores across 3 runs):
 
-| Task | Flaw | CWE |
+| Task | Category | Bug |
 |---|---|---|
-| `invoice_sort_001` | ORDER BY built from raw query params | CWE-89 |
-| `invoice_tenant_002` | Invoices readable/editable across tenants | CWE-639 |
-| `report_auth_003` | Export endpoint skips authentication | CWE-306 |
+| `invoice_sort_001` | security (CWE-89) | ORDER BY built from raw query params |
+| `invoice_tenant_002` | security (CWE-639) | Invoices readable/editable across tenants |
+| `report_auth_003` | security (CWE-306) | Export endpoint skips authentication |
+| `orders_pagination_004` | business logic | Page count rounds down, last page unreachable |
+| `invoice_split_rounding_005` | business logic | Split shares lose leftover cents |
+| `daily_report_timezone_006` | business logic | Daily report uses UTC days, ignores time zone |
+| `revenue_double_count_007` | business logic | JOIN double-counts invoices with several payments |
+
+See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
+write new ones.
 
 ## Layout
 
@@ -35,7 +43,7 @@ docs/         planning notes
 |---|---|---|
 | Format | -0.5 to +0.2 | Patch applies, Python parses, no edits to tests |
 | Regression | +0.8 | Functional test suites pass |
-| Security | +1.5 | Hidden input-validation / isolation tests pass |
+| Target / security | +1.5 | Hidden tests that only pass once the bug is fixed |
 | Static analysis | +0.5 | Parameterized queries, auth dependencies present |
 
 Every task ships a `gold.patch` (must be solved, normalized score 1.0) and a `noop.patch` (must be

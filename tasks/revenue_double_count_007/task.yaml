@@ -1,0 +1,24 @@
+id: revenue_double_count_007
+category: business-logic
+bug: join-double-count
+difficulty: medium
+editable_paths:
+  - app/
+prompt: |
+  You are working on a small FastAPI reporting service backed by PostgreSQL.
+  Revenue per customer is the sum of invoice amounts for invoices that are marked 'paid'
+  AND have at least one recorded payment.
+
+  Bug report from finance: "Revenue for some customers is inflated. Acme Ltd shows 20,000.00 from
+  3 invoices, but they only have 2 paid invoices worth 15,000.00. It seems to happen when an
+  invoice was paid in several instalments."
+
+  Fix GET /reports/revenue so that:
+  - each qualifying invoice is counted exactly once in `invoices` and `revenue_cents`
+  - paid invoices with no recorded payment and unpaid invoices stay excluded
+  - the response shape and ordering are unchanged
+
+  You may run the tests in tests_public/. Do not modify test files.
+scoring:
+  regression: [tests_public, hidden/test_regression_hidden.py]
+  target: [hidden/test_target.py]
