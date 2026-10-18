@@ -5,6 +5,10 @@ Hidden tests are copied in only after the patch is applied, then every test
 group runs in its own pytest process.
 
     uv run python runtime/score_patch.py tasks/invoice_sort_001 tasks/invoice_sort_001/gold.patch
+    uv run python runtime/score_patch.py --sandbox docker tasks/invoice_sort_001 my.patch
+
+`local` mode imports the app into the test process (fast, for development).
+`docker` mode runs it in isolated containers (see sandbox.py) and is the one to trust.
 """
 
 from __future__ import annotations
@@ -15,7 +19,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from dataclasses import asdict
 from pathlib import Path
 
@@ -24,6 +27,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from sandbox import parse_junit, run_episode  # noqa: E402
 from verifier.gates import RewardBreakdown, score  # noqa: E402
 
 AGENT_VISIBLE = ["app", "tests_public", "seed.sql"]
@@ -59,13 +63,7 @@ def run_tests(workdir: Path, target: str) -> tuple[int, int]:
         cwd=workdir,
         capture_output=True,
     )
-    if not report.exists():
-        return 0, 1
-    suite = ET.parse(report).getroot()
-    suite = suite if suite.tag == "testsuite" else suite.find("testsuite")
-    total = int(suite.get("tests", 0))
-    failed = sum(int(suite.get(k, 0)) for k in ("failures", "errors", "skipped"))
-    return total - failed, max(total, 1)
+    return parse_junit(report)
 
 
 def run_group(workdir: Path, targets: list[str]) -> tuple[int, int]:
@@ -85,7 +83,7 @@ def read_py(workdir: Path, paths) -> dict[str, str]:
     }
 
 
-def score_patch(task_dir: Path, patch: Path) -> RewardBreakdown:
+def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBreakdown:
     task_dir, patch = task_dir.resolve(), patch.resolve()
     spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
     TMP_ROOT.mkdir(exist_ok=True)
@@ -102,12 +100,20 @@ def score_patch(task_dir: Path, patch: Path) -> RewardBreakdown:
 
         shutil.copytree(task_dir / "hidden", workdir / "hidden")
         app_paths = [p.relative_to(workdir) for p in (workdir / "app").rglob("*.py")]
+        if sandbox == "docker":
+            n = len(spec["regression"])
+            counts = run_episode(workdir, spec["regression"] + spec["security"])
+            regression = tuple(map(sum, zip(*counts[:n])))
+            security = tuple(map(sum, zip(*counts[n:])))
+        else:
+            regression = run_group(workdir, spec["regression"])
+            security = run_group(workdir, spec["security"])
         return score(
             changed_files=read_py(workdir, touched),
             touched_paths=touched,
             app_files=read_py(workdir, app_paths),
-            regression=run_group(workdir, spec["regression"]),
-            security=run_group(workdir, spec["security"]),
+            regression=regression,
+            security=security,
         )
 
 
@@ -115,8 +121,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("task_dir", type=Path)
     parser.add_argument("patch", type=Path)
+    parser.add_argument("--sandbox", choices=["local", "docker"], default="local")
     args = parser.parse_args()
-    r = score_patch(args.task_dir, args.patch)
+    r = score_patch(args.task_dir, args.patch, args.sandbox)
     print(json.dumps({**asdict(r), "total": r.total, "normalized": round(r.normalized, 3)}, indent=2))
 
 

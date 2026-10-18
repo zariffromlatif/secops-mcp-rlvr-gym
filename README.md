@@ -45,9 +45,32 @@ unsolved with a security score of 0). Patches that edit test files score -0.5.
 
 ```bash
 uv sync
-docker compose -f runtime/docker-compose.yml up -d
-uv run python runtime/validate_tasks.py
-uv run python runtime/score_patch.py tasks/invoice_sort_001 path/to/your.patch
+uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
+uv run python runtime/score_patch.py --sandbox docker tasks/invoice_sort_001 path/to/your.patch
+uv run python runtime/score_batch.py patches/ results.csv --workers 4
 ```
 
-Set `DATABASE_URL` to point at a different Postgres.
+`score_batch.py` expects `patches/<task_id>/*.patch` (for example patches generated on Kaggle or
+Colab) and writes one CSV row per patch.
+
+## Sandbox
+
+`--sandbox docker` scores each patch in its own throwaway environment:
+
+- an internal Docker network with **no internet access**
+- a fresh Postgres per episode (data on tmpfs)
+- the patched app in its own container: read-only filesystem, non-root, all capabilities dropped,
+  memory / CPU / process limits
+- tests in a separate container that reaches the app over HTTP, so the agent's code never runs
+  inside the test process and cannot tamper with results
+- hidden tests mounted read-only, only at scoring time
+- everything removed afterwards, even on errors
+
+The sandbox image (~290 MB) builds automatically on first use and is rebuilt when
+`runtime/Dockerfile.sandbox` or `runtime/requirements-sandbox.txt` changes.
+
+### Local mode
+
+Without `--sandbox docker`, tests import the app in-process against a Postgres on port 5433
+(`docker compose -f runtime/docker-compose.yml up -d`). It is faster for writing tasks but not
+isolated. Set `DATABASE_URL` to use a different Postgres.

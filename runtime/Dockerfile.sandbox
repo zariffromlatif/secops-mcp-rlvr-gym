@@ -1,0 +1,17 @@
+# Image for both sides of an episode: the app container (agent's code) and the
+# test container (public + hidden tests). Neither ever gets network access.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=0 \
+    TZ=UTC \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+COPY requirements-sandbox.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt && rm /tmp/requirements.txt \
+    && useradd --uid 1000 --create-home runner
+
+USER runner
+WORKDIR /work
