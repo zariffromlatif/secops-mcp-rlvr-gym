@@ -18,6 +18,11 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.2"]
+envs = ["secops-gym-patches", "secops-gym-workflows"]
 
 [tool.pytest.ini_options]
 testpaths = ["verifier"]
+
+[tool.uv.sources]
+secops-gym-patches = { path = "environments/secops_gym_patches", editable = true }
+secops-gym-workflows = { path = "environments/secops_gym_workflows", editable = true }

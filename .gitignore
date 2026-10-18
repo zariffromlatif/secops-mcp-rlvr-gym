@@ -8,3 +8,6 @@ checkpoints/
 wandb/
 *.safetensors
 .tmp/
+environments/*/*/data/
+environments/*/*/_vendor/
+environments/*/*/image/requirements.txt

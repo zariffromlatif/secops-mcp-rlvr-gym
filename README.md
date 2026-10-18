@@ -39,6 +39,7 @@ write new ones.
 ```
 tasks/        patch tasks (app, public tests, hidden checks, gold/noop patches)
 workflows/    MCP workflow tasks (seed, prompt, hidden state checks, trajectories)
+environments/ Prime Intellect verifiers packages wrapping both task families
 verifier/     multi-gate reward function
 runtime/      Docker sandbox and episode runner
 env/          adapter to the Prime Intellect `verifiers` format
@@ -93,6 +94,30 @@ uv run python runtime/workflows.py finish workflows/duplicate_webhook_refunds_10
 ```
 
 Workflows use the Postgres from `docker compose -f runtime/docker-compose.yml up -d`.
+
+## Prime Intellect environments
+
+Both task families are packaged as [verifiers](https://github.com/PrimeIntellect-ai/verifiers) v1
+environments under `environments/`:
+
+| Package | Tasks | Harness | Runtime | `vf-validate` |
+|---|---|---|---|---|
+| `secops_gym_patches` | 7 patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 7/7 valid |
+| `secops_gym_workflows` | 3 MCP workflows | tool-only chat | subprocess + Postgres | 3/3 valid |
+
+```bash
+uv sync --extra mcp --extra envs              # Linux / macOS / WSL (verifiers is Unix-only)
+uv run python scripts/sync_envs.py            # copy tasks + shared code into the packages
+sh scripts/build_task_image.sh                # per-rollout box image (~300 MB)
+uv run vf-validate secops_gym_patches --runtime.type docker
+uv run vf-validate secops_gym_workflows --runtime.type subprocess
+```
+
+On Windows, run the same commands inside the Linux devbox: `sh scripts/devbox.sh uv run --no-sync vf-validate ...`.
+
+Publishing: run the **publish-task-image** GitHub Action (pushes `ghcr.io/<owner>/secops-gym-task`),
+make that package public on GitHub, then push each environment from its folder with the
+`prime` CLI (`prime login`, then `prime env push`).
 
 ## Sandbox
 

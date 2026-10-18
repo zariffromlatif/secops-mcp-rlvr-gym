@@ -30,3 +30,34 @@ jobs:
         run: uv run python runtime/workflows.py validate
       - name: MCP server lists all tools
         run: uv run python -c "import asyncio, sys; sys.path.insert(0, 'runtime'); import mcp_server; print([t.name for t in asyncio.run(mcp_server.server.list_tools())])"
+
+  verifiers:
+    # Both Prime Intellect environments, through verifiers' own validator.
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gym
+          POSTGRES_PASSWORD: gym
+          POSTGRES_DB: gym
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gym"
+          --health-interval 2s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra mcp --extra envs
+      - name: Build task image
+        run: sh scripts/build_task_image.sh
+      - name: vf-validate secops_gym_patches (gold + noop, Docker runtime)
+        run: |
+          uv run vf-validate secops_gym_patches --runtime.type docker -o vf-out/patches
+          python -c "import json,glob,sys; s=json.load(open(glob.glob('vf-out/patches/*/summary.json')[0])); print(s['outcomes']); sys.exit(s['valid_rate'] != 1.0)"
+      - name: vf-validate secops_gym_workflows (gold + noop)
+        run: |
+          uv run vf-validate secops_gym_workflows --runtime.type subprocess -o vf-out/workflows
+          python -c "import json,glob,sys; s=json.load(open(glob.glob('vf-out/workflows/*/summary.json')[0])); print(s['outcomes']); sys.exit(s['valid_rate'] != 1.0)"

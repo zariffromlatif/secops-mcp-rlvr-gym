@@ -8,6 +8,7 @@ A workflow episode:
 
     uv run python runtime/workflows.py score workflows/duplicate_webhook_refunds_101 gold.json
     uv run python runtime/workflows.py validate
+    uv run python runtime/workflows.py cleanup      # drop leftover episode databases
     uv run python runtime/workflows.py start workflows/duplicate_webhook_refunds_101   # for live agents
     uv run python runtime/workflows.py finish workflows/duplicate_webhook_refunds_101 <db_name>
 """
@@ -90,6 +91,17 @@ def create_episode_db(wf_dir: Path) -> str:
         conn.exec_driver_sql(f"GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {AGENT_ROLE}")
     episode.dispose()
     return name
+
+
+def cleanup_episode_dbs() -> list[str]:
+    """Drop every leftover episode database (wf_*), e.g. after interrupted runs."""
+    admin = _admin()
+    with admin.connect() as conn:
+        names = [r[0] for r in conn.execute(text(r"SELECT datname FROM pg_database WHERE datname LIKE 'wf\_%'"))]
+        for name in names:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+    admin.dispose()
+    return names
 
 
 def drop_episode_db(name: str) -> None:
@@ -183,6 +195,7 @@ def main() -> int:
     s.add_argument("workflow", type=Path)
     s.add_argument("trajectory", type=Path)
     sub.add_parser("validate")
+    sub.add_parser("cleanup")
     st = sub.add_parser("start")
     st.add_argument("workflow", type=Path)
     fin = sub.add_parser("finish")
@@ -192,6 +205,9 @@ def main() -> int:
 
     if args.cmd == "validate":
         return validate()
+    if args.cmd == "cleanup":
+        print(f"dropped {len(cleanup_episode_dbs())} episode database(s)")
+        return 0
     if args.cmd == "score":
         trajectory = json.loads(args.trajectory.read_text())
         print(json.dumps(report(score_trajectory(args.workflow, trajectory)), indent=2))
