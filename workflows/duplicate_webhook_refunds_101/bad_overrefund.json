@@ -1,0 +1,7 @@
+[
+  {"tool": "issue_refund", "args": {"payment_id": 2, "reason": "duplicate"}},
+  {"tool": "issue_refund", "args": {"payment_id": 5, "reason": "duplicate"}},
+  {"tool": "issue_refund", "args": {"payment_id": 6, "reason": "duplicate"}},
+  {"tool": "issue_refund", "args": {"payment_id": 8, "reason": "same customer and amount"}},
+  {"tool": "post_message", "args": {"channel": "#billing", "text": "Refunded 4 charges for karim.hossain@example.com and others, total 70.00."}}
+]

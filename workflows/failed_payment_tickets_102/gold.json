@@ -1,0 +1,7 @@
+[
+  {"tool": "sql_query", "args": {"query": "SELECT c.id, c.name, COUNT(*) AS failures, MAX(p.created_at) AS latest FROM payments p JOIN customers c ON c.id = p.customer_id WHERE p.status = 'failed' AND p.created_at >= '2026-03-01' AND p.created_at < '2026-04-01' GROUP BY c.id, c.name HAVING COUNT(*) >= 3 ORDER BY c.id"}},
+  {"tool": "sql_query", "args": {"query": "SELECT customer_id, title, status FROM tickets WHERE title LIKE 'Repeated payment failures:%'"}},
+  {"tool": "sql_query", "args": {"query": "SELECT DISTINCT ON (customer_id) customer_id, id FROM payments WHERE status = 'failed' AND customer_id IN (1, 5) ORDER BY customer_id, created_at DESC"}},
+  {"tool": "create_ticket", "args": {"customer_id": 1, "title": "Repeated payment failures: Rahim Uddin", "body": "3 failed payments in March 2026; most recent on 2026-03-20.", "linked_payment_id": 4}},
+  {"tool": "create_ticket", "args": {"customer_id": 5, "title": "Repeated payment failures: Tanvir Rahman", "body": "3 failed payments in March 2026; most recent on 2026-03-31.", "linked_payment_id": 17}}
+]

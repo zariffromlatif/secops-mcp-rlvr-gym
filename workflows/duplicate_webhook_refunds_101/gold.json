@@ -1,0 +1,7 @@
+[
+  {"tool": "sql_query", "args": {"query": "SELECT id, webhook_id, created_at FROM payments p WHERE status = 'succeeded' AND EXISTS (SELECT 1 FROM payments e WHERE e.webhook_id = p.webhook_id AND e.status = 'succeeded' AND e.created_at < p.created_at) ORDER BY id"}},
+  {"tool": "issue_refund", "args": {"payment_id": 2, "reason": "duplicate webhook wh_1001"}},
+  {"tool": "issue_refund", "args": {"payment_id": 5, "reason": "duplicate webhook wh_1003"}},
+  {"tool": "issue_refund", "args": {"payment_id": 6, "reason": "duplicate webhook wh_1003"}},
+  {"tool": "post_message", "args": {"channel": "#billing", "text": "Refunded 3 duplicate charges from yesterday's webhook incident, total 55.00."}}
+]

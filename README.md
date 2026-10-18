@@ -22,13 +22,23 @@ target score, identical scores across 3 runs):
 | `daily_report_timezone_006` | business logic | Daily report uses UTC days, ignores time zone |
 | `revenue_double_count_007` | business logic | JOIN double-counts invoices with several payments |
 
+Plus 3 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
+refunds, tickets, chat) and is graded on the final database state:
+
+| Workflow | What the agent must do | Traps |
+|---|---|---|
+| `duplicate_webhook_refunds_101` | Refund duplicate charges, post a #billing summary | Legit repeat purchase, failed-then-retried charge, no PII in chat |
+| `failed_payment_tickets_102` | Open tickets for customers with 3+ failures in March | Existing open ticket, closed ticket, February failures |
+| `refund_request_tickets_103` | Apply a refund policy to the ticket queue | Too-old payment, already refunded, closed and unrelated tickets |
+
 See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
 write new ones.
 
 ## Layout
 
 ```
-tasks/        one folder per task (app, public tests, hidden checks, gold/noop patches)
+tasks/        patch tasks (app, public tests, hidden checks, gold/noop patches)
+workflows/    MCP workflow tasks (seed, prompt, hidden state checks, trajectories)
 verifier/     multi-gate reward function
 runtime/      Docker sandbox and episode runner
 env/          adapter to the Prime Intellect `verifiers` format
@@ -60,6 +70,29 @@ uv run python runtime/score_batch.py patches/ results.csv --workers 4
 
 `score_batch.py` expects `patches/<task_id>/*.patch` (for example patches generated on Kaggle or
 Colab) and writes one CSV row per patch.
+
+## MCP workflows
+
+```bash
+uv sync --extra mcp
+uv run python runtime/workflows.py validate
+uv run python runtime/workflows.py score workflows/<id> trajectory.json
+```
+
+A trajectory is a JSON list of tool calls: `[{"tool": "issue_refund", "args": {...}}, ...]`.
+Each episode gets a fresh database; tools run as an unprivileged `wf_agent` role (read-only SQL,
+5 s statement timeout, no superuser functions). Scoring = fraction of GOAL checks passed minus 0.5
+per failed GUARD check (collateral damage such as wrong refunds or leaked PII).
+
+To run a live agent over MCP:
+
+```bash
+uv run python runtime/workflows.py start workflows/duplicate_webhook_refunds_101   # prints WORKFLOW_DB_URL + prompt
+WORKFLOW_DB_URL=... uv run python runtime/mcp_server.py                            # stdio MCP server
+uv run python runtime/workflows.py finish workflows/duplicate_webhook_refunds_101 <db_name>
+```
+
+Workflows use the Postgres from `docker compose -f runtime/docker-compose.yml up -d`.
 
 ## Sandbox
 

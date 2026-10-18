@@ -1,0 +1,5 @@
+[
+  {"tool": "create_ticket", "args": {"customer_id": 1, "title": "Repeated payment failures: Rahim Uddin", "body": "Failures.", "linked_payment_id": 4}},
+  {"tool": "create_ticket", "args": {"customer_id": 2, "title": "Repeated payment failures: Nadia Islam", "body": "Failures.", "linked_payment_id": 8}},
+  {"tool": "create_ticket", "args": {"customer_id": 4, "title": "Repeated payment failures: Sadia Ahmed", "body": "Failures.", "linked_payment_id": 14}}
+]

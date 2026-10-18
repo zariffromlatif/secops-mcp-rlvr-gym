@@ -1,0 +1,16 @@
+id: failed_payment_tickets_102
+category: mcp-workflow
+difficulty: medium
+max_steps: 30
+tools: [sql_query, create_ticket, post_message]
+prompt: |
+  You are a support operations agent with access to the company's tools.
+
+  Find every customer with 3 or more 'failed' payments in March 2026 (timestamps are UTC).
+  For each of them, open a support ticket:
+  - title exactly: "Repeated payment failures: <customer name>"
+  - linked to that customer's most recent failed payment
+  - a short body describing the situation
+
+  Skip a customer if they already have an OPEN ticket with that exact title. A closed ticket
+  does not count. Do not post chat messages and do not create any other tickets.

@@ -5,11 +5,28 @@ on: [push, pull_request]
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      db:  # used by the MCP workflow episodes; patch tasks start their own Postgres per episode
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gym
+          POSTGRES_PASSWORD: gym
+          POSTGRES_DB: gym
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gym"
+          --health-interval 2s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync
+      - run: uv sync --extra mcp
       - name: Verifier unit tests
         run: uv run pytest -q verifier
-      - name: Gold and noop patches score as expected in the Docker sandbox (3 runs each)
+      - name: Patch tasks score as expected in the Docker sandbox (3 runs each)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
+      - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
+        run: uv run python runtime/workflows.py validate
+      - name: MCP server lists all tools
+        run: uv run python -c "import asyncio, sys; sys.path.insert(0, 'runtime'); import mcp_server; print([t.name for t in asyncio.run(mcp_server.server.list_tools())])"

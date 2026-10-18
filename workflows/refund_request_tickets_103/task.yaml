@@ -1,0 +1,16 @@
+id: refund_request_tickets_103
+category: mcp-workflow
+difficulty: medium
+max_steps: 30
+tools: [sql_query, issue_refund, close_ticket]
+prompt: |
+  You are a support agent processing the refund queue. Today is 2026-03-31.
+
+  Handle every OPEN ticket whose title starts with "Refund request". Each one links a payment.
+  Refund policy:
+  - refund the linked payment if its status is 'succeeded' and it was created on or after
+    2026-03-01
+  - otherwise deny the request (for example: too old, or already refunded)
+
+  Close each of these tickets with a resolution that starts with "refunded" or "denied: <reason>".
+  Leave all other tickets, including closed ones, exactly as they are.

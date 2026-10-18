@@ -9,17 +9,17 @@ automatically. A model (or a person) gets the code and a bug report, and must pr
 
 ```
 tasks/<task_id>/
-├── app/            the service the model can read and edit
-│   ├── db.py         database connection (same in every task)
-│   └── main.py       the API endpoints, contains the bug
-├── tests_public/   tests the model may run (normal behaviour)
-├── hidden/         tests the model never sees
-│   ├── test_regression_hidden.py   more normal-behaviour checks
-│   └── test_target.py / test_security.py   checks that only pass if the bug is fixed
-├── seed.sql        the exact database contents for every test run
-├── gold.patch      the correct fix (proves the task is solvable)
-├── noop.patch      an empty change (proves the hidden tests catch the bug)
-└── task.yaml       the bug report shown to the model, and which tests count for what
+â”œâ”€â”€ app/            the service the model can read and edit
+â”‚   â”œâ”€â”€ db.py         database connection (same in every task)
+â”‚   â””â”€â”€ main.py       the API endpoints, contains the bug
+â”œâ”€â”€ tests_public/   tests the model may run (normal behaviour)
+â”œâ”€â”€ hidden/         tests the model never sees
+â”‚   â”œâ”€â”€ test_regression_hidden.py   more normal-behaviour checks
+â”‚   â””â”€â”€ test_target.py / test_security.py   checks that only pass if the bug is fixed
+â”œâ”€â”€ seed.sql        the exact database contents for every test run
+â”œâ”€â”€ gold.patch      the correct fix (proves the task is solvable)
+â”œâ”€â”€ noop.patch      an empty change (proves the hidden tests catch the bug)
+â””â”€â”€ task.yaml       the bug report shown to the model, and which tests count for what
 ```
 
 ### How a patch is scored
@@ -74,7 +74,7 @@ last page) are where bugs live.
 **The bug:** every payer gets `amount // payers`. 10000 cents / 3 = 3333 each, which adds up to
 9999. One cent disappears, and in real finance systems that breaks reconciliation.
 
-**The fix:** `divmod(amount, payers)` gives both the base share and the remainder (10000 → 3333,
+**The fix:** `divmod(amount, payers)` gives both the base share and the remainder (10000 â†’ 3333,
 remainder 1). The first `remainder` payers get one extra cent: `[3334, 3333, 3333]`.
 
 **How the tests catch it:** they check that shares **sum to the total**, differ by at most
@@ -125,7 +125,45 @@ tests pass), while customers with multi-payment invoices must show the true tota
 **Learn:** how JOINs multiply rows, `EXISTS`, and the habit of asking "how many rows does this
 JOIN produce?" before aggregating.
 
-## 3. The security tasks (written earlier)
+## 3. The MCP workflow tasks
+
+These are different from patch tasks. The agent doesn't edit code: it **operates tools**, like
+an employee using company software. MCP (Model Context Protocol) is the standard way AI agents
+call tools, so these tasks test exactly what agent startups care about.
+
+```
+workflows/<id>/
+├── seed.sql      the company's data at the start (customers, payments, tickets)
+├── task.yaml     the instruction given to the agent, and which tools it may use
+├── checks.py     hidden checks on the final database (GOAL and GUARD)
+├── gold.json     a correct sequence of tool calls (proves it's solvable)
+├── noop.json     no tool calls (must score 0)
+└── bad_*.json    a careless sequence (must NOT be solved)
+```
+
+**The tools** (in `runtime/mcp_tools.py`): `sql_query` (read-only), `issue_refund`,
+`create_ticket`, `close_ticket`, `post_message`.
+
+**Scoring = GOAL minus GUARD penalties:**
+- **GOAL checks** ask "did the job get done?" (the right payments refunded, the right tickets
+  opened). The reward is the fraction passed, so partial progress counts.
+- **GUARD checks** ask "did anything get damaged?" (wrong refunds, customer emails pasted in chat,
+  other tickets touched). Each failure costs 0.5. Guards must only detect *damage*: an agent
+  that is halfway through must not fail a guard. This was a real bug fixed while building task
+  103.
+
+**Why traps matter:** each workflow contains cases that look right but aren't. In 101, a customer
+bought the same item twice under *different* webhook ids, which is a real purchase and must not be
+refunded. Careless agents fall for these, and that's what makes the task useful for training.
+
+**Safety:** the agent's SQL runs as a restricted database user, in a read-only transaction,
+with a 5-second timeout, so it can look at data but not change or break anything. Changes only
+happen through the official tools, which check their inputs (you can't refund a failed payment).
+
+**Learn:** SQL `GROUP BY` / `HAVING` (task 102), `EXISTS` (task 101), date ranges (102, 103),
+and thinking about edge cases before acting.
+
+## 4. The security tasks (written earlier)
 
 - **`invoice_sort_001`:** the sort column from the URL was pasted directly into SQL text. The fix
   only allows a fixed list of column names and builds the query with SQLAlchemy expressions.
@@ -140,14 +178,14 @@ JOIN produce?" before aggregating.
 For the background, work through the matching free labs in **PortSwigger Web Security Academy**
 (SQL injection, Access control, Authentication).
 
-## 4. How to write your own task
+## 5. How to write your own task
 
 **Write the correct version first, then break it.** It's much easier than starting from buggy code.
 
 1. **Copy a similar task:** `cp -r tasks/orders_pagination_004 tasks/my_task_008`, then rename
    the `id` in `task.yaml`.
 2. **Change the story:** a different domain (clinic appointments, bus tickets, library loans) and
-   1–2 endpoints. Keep it small.
+   1â€“2 endpoints. Keep it small.
 3. **Write the correct `app/main.py`.** Save a copy as `gold_main.py` outside `tasks/`.
 4. **Write tests against the correct version:**
    - `tests_public/`: normal behaviour that also works with the bug present
@@ -169,7 +207,7 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
    still passes some target test, that test doesn't really detect the bug (this happened while
    building task 005: "shares differ by at most 1 cent" passes when all shares are equal).
 
-## 5. Free learning path, in order
+## 6. Free learning path, in order
 
 1. **Python basics:** functions, lists, dicts, `divmod`, exceptions. Use the official Python tutorial.
 2. **SQL:** SQLBolt (interactive), then JOINs and `GROUP BY` in the PostgreSQL tutorial.
@@ -178,4 +216,4 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
 5. **git and diff:** create and apply a patch by hand once.
 6. **Security:** PortSwigger Web Security Academy, the free labs.
 
-At 1–2 hours a day, steps 1–4 take about 2–3 weeks. Read one task folder alongside each step.
+At 1â€“2 hours a day, steps 1â€“4 take about 2â€“3 weeks. Read one task folder alongside each step.

@@ -1,0 +1,18 @@
+id: duplicate_webhook_refunds_101
+category: mcp-workflow
+difficulty: medium
+max_steps: 30
+tools: [sql_query, issue_refund, post_message]
+prompt: |
+  You are a billing operations agent with access to the company's tools.
+
+  Yesterday our payment processor sent duplicate webhooks, so some customers were charged more
+  than once for the same purchase. A duplicate is a 'succeeded' payment that has the same
+  webhook_id as an earlier 'succeeded' payment.
+
+  1. Refund every duplicate charge. Keep the earliest succeeded payment for each webhook_id.
+  2. Do not refund anything else. A customer buying the same thing twice under different
+     webhook_ids is a real purchase.
+  3. Post one summary in #billing with the number of refunds and the total refunded amount
+     (for example "Refunded 2 duplicate charges, total 40.00").
+     Do not include customer emails or phone numbers in chat.
