@@ -117,7 +117,10 @@ On Windows, run the same commands inside the Linux devbox: `sh scripts/devbox.sh
 
 Publishing: the task image is public at `ghcr.io/zariffromlatif/secops-gym-task:0.1` (rebuild it
 with the **publish-task-image** GitHub Action). Push each environment from its folder with the
-`prime` CLI (`prime login`, then `prime env push`).
+`prime` CLI (`prime login`, then `prime env push --visibility PRIVATE` from the environment
+folder). On Windows, set `PYTHONUTF8=1` first or the CLI crashes printing status symbols.
+
+Hub (private, v0.1.0): `zariffromlatif/secops-gym-patches`, `zariffromlatif/secops-gym-workflows`.
 
 ## Sandbox
 

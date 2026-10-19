@@ -11,3 +11,4 @@ wandb/
 environments/*/*/data/
 environments/*/*/_vendor/
 environments/*/*/image/requirements.txt
+environments/*/.prime/
