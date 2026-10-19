@@ -19,6 +19,7 @@ from pathlib import Path
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from sqlalchemy import create_engine
+from sqlalchemy.exc import DBAPIError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -34,6 +35,9 @@ def _run(name: str, **args):
             return mcp_tools.call_tool(conn, name, args)
     except mcp_tools.ToolError as exc:
         raise ToolError(str(exc)) from None  # shown to the agent as an is_error result
+    except DBAPIError:
+        # Don't leak connection details (hosts, ports) to the agent.
+        raise ToolError("internal error: the company database is temporarily unavailable") from None
 
 
 @server.tool()

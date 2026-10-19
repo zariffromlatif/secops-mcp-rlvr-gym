@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import DBAPIError
 
 import verifiers.v1 as vf
 from secops_gym_workflows._vendor import mcp_tools
@@ -56,6 +57,9 @@ class CompanyToolset(vf.Toolset[vf.ToolsetConfig, WorkflowState]):
                 return mcp_tools.call_tool(conn, name, args)
         except mcp_tools.ToolError as exc:
             raise ToolError(str(exc)) from None
+        except DBAPIError:
+            # Don't leak connection details (hosts, ports) to the agent.
+            raise ToolError("internal error: the company database is temporarily unavailable") from None
 
     @vf.tool
     def sql_query(self, query: str) -> list[dict]:
