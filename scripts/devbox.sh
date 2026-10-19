@@ -7,7 +7,10 @@
 set -e
 cd "$(dirname "$0")/.."
 docker image inspect secops-gym-devbox >/dev/null 2>&1 || docker build -q -t secops-gym-devbox runtime/devbox >/dev/null
-MSYS_NO_PATHCONV=1 docker run --rm -i \
+# API keys for evals live in .env (git-ignored) and are passed through as environment variables.
+ENV_FILE=""
+[ -f .env ] && ENV_FILE="--env-file .env"
+MSYS_NO_PATHCONV=1 docker run --rm -i $ENV_FILE \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$(pwd -W 2>/dev/null || pwd):/work" \
     -v /tmp/vfshare:/tmp/vfshare -e TMPDIR=/tmp/vfshare \

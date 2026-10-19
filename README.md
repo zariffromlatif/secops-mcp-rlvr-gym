@@ -42,7 +42,6 @@ workflows/    MCP workflow tasks (seed, prompt, hidden state checks, trajectorie
 environments/ Prime Intellect verifiers packages wrapping both task families
 verifier/     multi-gate reward function
 runtime/      Docker sandbox and episode runner
-env/          adapter to the Prime Intellect `verifiers` format
 training/     GRPO training and evaluation scripts
 thesis/       experiment configs and result CSVs
 docs/         planning notes
