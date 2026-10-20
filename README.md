@@ -31,6 +31,10 @@ refunds, tickets, chat) and is graded on the final database state:
 | `failed_payment_tickets_102` | Open tickets for customers with 3+ failures in March | Existing open ticket, closed ticket, February failures |
 | `refund_request_tickets_103` | Apply a refund policy to the ticket queue | Too-old payment, already refunded, closed and unrelated tickets |
 
+**First model evaluation:** Qwen3.8-27B solved 9/10 tasks. On `invoice_sort_001`, the static gate
+caught an f-string SQL fix that the tests alone would have accepted. See
+[results/evals/](results/evals/README.md).
+
 See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
 write new ones.
 

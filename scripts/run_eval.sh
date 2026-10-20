@@ -8,19 +8,21 @@
 # OpenAI-compatible provider). Results land in .tmp/evals/.
 set -e
 cd "$(dirname "$0")/.."
+#   sh scripts/run_eval.sh resume .tmp/evals/<run-dir>     # re-run missing/errored episodes
 ENV="$1"; MODEL="$2"; shift 2
+KEY_VAR="${UPSTREAM_API_KEY_VAR:-GROQ_API_KEY}"
 case "$ENV" in
-    patches)   TASKSET=secops_gym_patches;   RUNTIME=docker ;;
-    workflows) TASKSET=secops_gym_workflows; RUNTIME=subprocess ;;
-    *) echo "usage: $0 patches|workflows <model> [vf-eval args]"; exit 2 ;;
+    patches)   EVAL="vf-eval secops_gym_patches --env.agent.runtime.type docker --model $MODEL \
+                    --client.base-url http://127.0.0.1:8099/v1 --client.api-key-var $KEY_VAR -c 1 -o /work/.tmp/evals" ;;
+    workflows) EVAL="vf-eval secops_gym_workflows --env.agent.runtime.type subprocess --model $MODEL \
+                    --client.base-url http://127.0.0.1:8099/v1 --client.api-key-var $KEY_VAR -c 1 -o /work/.tmp/evals" ;;
+    resume)    EVAL="vf-eval @ /work/$MODEL/configs/resolved/eval.json --resume" ;;
+    *) echo "usage: $0 patches|workflows <model> [vf-eval args]  |  $0 resume <run-dir>"; exit 2 ;;
 esac
 docker compose -f runtime/docker-compose.yml up -d --wait >/dev/null 2>&1
-KEY_VAR="${UPSTREAM_API_KEY_VAR:-GROQ_API_KEY}"
 sh scripts/devbox.sh sh -c "
     UPSTREAM_BASE_URL='${UPSTREAM_BASE_URL:-https://api.groq.com/openai/v1}' UPSTREAM_API_KEY_VAR=$KEY_VAR \
-        uv run --no-sync python scripts/llm_proxy.py > /work/.tmp/llm_proxy.log 2>&1 &
+        uv run --no-sync python scripts/llm_proxy.py >> /work/.tmp/llm_proxy.log 2>&1 &
     sleep 3
-    uv run --no-sync vf-eval $TASKSET --env.agent.runtime.type $RUNTIME --model $MODEL \
-        --client.base-url http://127.0.0.1:8099/v1 --client.api-key-var $KEY_VAR \
-        -c 1 -o /work/.tmp/evals $* 2>&1 | grep -vE 'deprecated|prime-rl|Trace push|PRIME_API_KEY|mode=.disabled|live into a dashboard'
+    uv run --no-sync $EVAL $* 2>&1 | grep -vE 'deprecated|prime-rl|Trace push|PRIME_API_KEY|mode=.disabled|live into a dashboard'
 "

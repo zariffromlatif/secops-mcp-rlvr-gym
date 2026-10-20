@@ -1,0 +1,5 @@
+task,attempts,errored,solved,solve_rate,mean_reward
+duplicate_webhook_refunds_101,1,0,1,1.0,1.0
+failed_payment_tickets_102,1,0,1,1.0,1.0
+refund_request_tickets_103,1,0,1,1.0,1.0
+ALL,3,0,3,1.0,1.0

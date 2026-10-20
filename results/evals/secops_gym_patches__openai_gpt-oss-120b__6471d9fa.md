@@ -1,0 +1,14 @@
+# secops_gym_patches · openai/gpt-oss-120b
+
+Source run: `secops_gym_patches--openai--gpt-oss-120b--bash--6471d9fa`
+
+| task | attempts | errored | solved | solve_rate | mean_reward | gate_regression | gate_target |
+|---|---|---|---|---|---|---|---|
+| daily_report_timezone_006 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
+| invoice_sort_001 | 1 | 0 | 0 | 0.0 | 0.833 | 0.8 | 1.5 |
+| invoice_split_rounding_005 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
+| invoice_tenant_002 | 1 | 1 | 0 |  |  |  |  |
+| orders_pagination_004 | 1 | 1 | 0 |  |  |  |  |
+| report_auth_003 | 1 | 1 | 0 |  |  |  |  |
+| revenue_double_count_007 | 1 | 1 | 0 |  |  |  |  |
+| ALL | 7 | 4 | 2 | 0.67 | 0.944 | 0.8 | 1.5 |

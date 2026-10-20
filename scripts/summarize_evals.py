@@ -62,7 +62,7 @@ def summarize(run_dir: Path) -> None:
     rows.append(row("ALL", [e for eps in by_task.values() for e in eps]))
 
     OUT.mkdir(parents=True, exist_ok=True)
-    stem = f"{env}__{model.replace('/', '_')}"
+    stem = f"{env}__{model.replace('/', '_')}__{name.rsplit('--', 1)[-1]}"
     fields = list(dict.fromkeys(k for r in rows for k in r))
     with (OUT / f"{stem}.csv").open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
