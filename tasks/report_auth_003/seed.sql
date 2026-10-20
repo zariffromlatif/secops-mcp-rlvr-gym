@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS invoices;
+DROP TABLE IF EXISTS invoices CASCADE;
 
 CREATE TABLE invoices (
     id SERIAL PRIMARY KEY,
@@ -20,7 +20,7 @@ INSERT INTO invoices (tenant_id, customer, amount_cents, status, created_at) VAL
     (2, 'Harbor Steel', 150000, 'overdue', '2026-02-14 10:30:00'),
     (2, 'Iris Health',   33000, 'paid',    '2026-03-01 09:00:00');
 
-DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS api_keys CASCADE;
 
 CREATE TABLE api_keys (
     key TEXT PRIMARY KEY,

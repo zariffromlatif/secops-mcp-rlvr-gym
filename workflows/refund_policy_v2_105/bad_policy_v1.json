@@ -1,0 +1,17 @@
+[
+  {"tool": "issue_refund", "args": {"payment_id": 1, "reason": "request"}},
+  {"tool": "issue_refund", "args": {"payment_id": 2, "reason": "request"}},
+  {"tool": "issue_refund", "args": {"payment_id": 3, "reason": "request"}},
+  {"tool": "issue_refund", "args": {"payment_id": 5, "reason": "request"}},
+  {"tool": "issue_refund", "args": {"payment_id": 6, "reason": "request"}},
+  {"tool": "issue_refund", "args": {"payment_id": 9, "reason": "request"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 1, "resolution": "refunded"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 2, "resolution": "refunded"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 3, "resolution": "refunded"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 4, "resolution": "denied: too old"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 5, "resolution": "refunded"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 6, "resolution": "refunded"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 7, "resolution": "denied: not refundable"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 8, "resolution": "refunded"}},
+  {"tool": "post_message", "args": {"channel": "#billing", "text": "Processed 8 refund requests: 6 refunded, 2 denied."}}
+]

@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS invoices;
+DROP TABLE IF EXISTS invoices CASCADE;
 
 -- created_at is stored in UTC.
 CREATE TABLE invoices (

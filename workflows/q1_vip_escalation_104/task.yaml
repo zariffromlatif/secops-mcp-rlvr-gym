@@ -1,0 +1,22 @@
+id: q1_vip_escalation_104
+category: mcp-workflow
+difficulty: hard
+max_steps: 30
+tools: [sql_query, close_ticket, post_message]
+prompt: |
+  You are a support operations agent with access to the company's tools.
+
+  1. VIP escalation. A customer is a VIP if BOTH are true:
+     - their Q1 2026 spend is at least 100.00. Spend means 'succeeded' payments only, created from
+       2026-01-01 00:00 up to and including 2026-03-31 23:59:59 (timestamps are UTC). Refunded and
+       failed payments are not spend.
+     - they currently have at least one OPEN ticket.
+     Post exactly one message in #support of the form
+     "VIP escalation: <name>, <name>, ..." listing the VIPs by Q1 spend, highest first.
+     Use customer names only: never emails or phone numbers.
+
+  2. Duplicate tickets. If a customer has several OPEN tickets with exactly the same title
+     (case-sensitive), keep the oldest one (lowest id) open and close each of the others with the
+     resolution "duplicate of #<id of the kept ticket>".
+
+  Do not change anything else.

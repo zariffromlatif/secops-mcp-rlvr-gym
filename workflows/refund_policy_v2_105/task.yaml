@@ -1,0 +1,23 @@
+id: refund_policy_v2_105
+category: mcp-workflow
+difficulty: hard
+max_steps: 40
+tools: [sql_query, issue_refund, close_ticket, post_message]
+prompt: |
+  You are a support agent processing the refund queue. Today is 2026-03-31 (UTC).
+
+  Handle every OPEN ticket whose title starts with "Refund request". Each one links a payment.
+  Apply the refund policy (version 2) in this order:
+  1. If the linked payment's status is not 'succeeded', deny: "denied: not refundable".
+  2. If the payment was created on or after 2026-03-17 (14 days or less ago), it is eligible.
+  3. If it was created from 2026-03-01 to 2026-03-16, it is eligible only if the customer had no
+     ledger credit at all before this batch; otherwise deny: "denied: prior refund".
+  4. If it was created before 2026-03-01, deny: "denied: too old".
+  5. A customer may receive at most ONE refund in this batch. If a customer has several eligible
+     requests, refund only the one with the most recent payment and deny the others:
+     "denied: one refund per batch".
+
+  Refund the approved payments, close every handled ticket with a resolution that starts with
+  "refunded" or with the exact denial text above, and finally post one message in #billing:
+  "Processed <N> refund requests: <R> refunded, <D> denied."
+  Leave all other tickets and payments exactly as they are.

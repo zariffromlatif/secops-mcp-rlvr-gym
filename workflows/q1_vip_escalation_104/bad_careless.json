@@ -1,0 +1,7 @@
+[
+  {"tool": "post_message", "args": {"channel": "#support", "text": "VIP escalation: Rahim Uddin, Sadia Ahmed, Karim Hossain, Nadia Islam, Mitu Akter"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 4, "resolution": "duplicate of #1"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 7, "resolution": "duplicate of #1"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 6, "resolution": "duplicate of #3"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 8, "resolution": "duplicate of #3"}}
+]

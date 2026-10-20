@@ -1,0 +1,8 @@
+[
+  {"tool": "sql_query", "args": {"query": "SELECT c.id, c.name, SUM(p.amount_cents) AS spend FROM customers c JOIN payments p ON p.customer_id = c.id WHERE p.status = 'succeeded' AND p.created_at >= '2026-01-01' AND p.created_at < '2026-04-01' GROUP BY c.id, c.name HAVING SUM(p.amount_cents) >= 10000 AND EXISTS (SELECT 1 FROM tickets t WHERE t.customer_id = c.id AND t.status = 'open') ORDER BY spend DESC"}},
+  {"tool": "sql_query", "args": {"query": "SELECT customer_id, title, array_agg(id ORDER BY id) AS ids FROM tickets WHERE status = 'open' GROUP BY customer_id, title HAVING COUNT(*) > 1"}},
+  {"tool": "post_message", "args": {"channel": "#support", "text": "VIP escalation: Sadia Ahmed, Rahim Uddin, Mitu Akter"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 4, "resolution": "duplicate of #1"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 6, "resolution": "duplicate of #3"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 8, "resolution": "duplicate of #3"}}
+]

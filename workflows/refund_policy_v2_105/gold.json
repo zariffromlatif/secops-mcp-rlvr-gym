@@ -1,0 +1,16 @@
+[
+  {"tool": "sql_query", "args": {"query": "SELECT t.id AS ticket_id, t.customer_id, p.id AS payment_id, p.status, p.created_at, EXISTS (SELECT 1 FROM ledger_credits l WHERE l.customer_id = t.customer_id) AS prior_credit FROM tickets t JOIN payments p ON p.id = t.linked_payment_id WHERE t.status = 'open' AND t.title LIKE 'Refund request%' ORDER BY t.customer_id, p.created_at DESC"}},
+  {"tool": "issue_refund", "args": {"payment_id": 1, "reason": "refund request ticket 1"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 1, "resolution": "refunded in full"}},
+  {"tool": "issue_refund", "args": {"payment_id": 2, "reason": "refund request ticket 2"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 2, "resolution": "refunded in full"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 3, "resolution": "denied: prior refund"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 4, "resolution": "denied: too old"}},
+  {"tool": "issue_refund", "args": {"payment_id": 5, "reason": "refund request ticket 5"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 5, "resolution": "refunded in full"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 6, "resolution": "denied: one refund per batch"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 7, "resolution": "denied: not refundable"}},
+  {"tool": "issue_refund", "args": {"payment_id": 9, "reason": "refund request ticket 8"}},
+  {"tool": "close_ticket", "args": {"ticket_id": 8, "resolution": "refunded in full"}},
+  {"tool": "post_message", "args": {"channel": "#billing", "text": "Processed 8 refund requests: 4 refunded, 4 denied."}}
+]
