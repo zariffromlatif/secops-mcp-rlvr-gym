@@ -1,0 +1,11 @@
+# secops_gym_patches · qwen/qwen3.8-27b
+
+Source run: `secops_gym_patches--qwen--qwen3.8-27b--bash--5e69eb2d`
+
+| task | attempts | errored | solved | solve_rate | mean_reward | gate_regression | gate_target |
+|---|---|---|---|---|---|---|---|
+| idempotency_keys_011 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
+| inventory_reservation_009 | 1 | 1 | 0 |  |  |  |  |
+| subscription_proration_008 | 1 | 1 | 0 |  |  |  |  |
+| tiered_pricing_010 | 1 | 1 | 0 |  |  |  |  |
+| ALL | 4 | 3 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |

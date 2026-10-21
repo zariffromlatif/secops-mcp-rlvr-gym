@@ -9,7 +9,7 @@ reward cannot be gamed by editing tests or special-casing inputs.
 
 ## Status
 
-7 tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
+11 patch tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
 target score, identical scores across 3 runs):
 
 | Task | Category | Bug |
@@ -21,8 +21,12 @@ target score, identical scores across 3 runs):
 | `invoice_split_rounding_005` | business logic | Split shares lose leftover cents |
 | `daily_report_timezone_006` | business logic | Daily report uses UTC days, ignores time zone |
 | `revenue_double_count_007` | business logic | JOIN double-counts invoices with several payments |
+| `subscription_proration_008` | business logic (hard) | 30-day month assumption + floor rounding |
+| `inventory_reservation_009` | business logic (hard) | Duplicate SKU lines oversell + non-idempotent release |
+| `tiered_pricing_010` | business logic (hard) | All-units instead of graduated pricing + exclusive bounds |
+| `idempotency_keys_011` | business logic (hard) | Body mismatch not rejected + keys not tenant-scoped |
 
-Plus 3 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
+Plus 5 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
 refunds, tickets, chat) and is graded on the final database state:
 
 | Workflow | What the agent must do | Traps |
@@ -30,9 +34,12 @@ refunds, tickets, chat) and is graded on the final database state:
 | `duplicate_webhook_refunds_101` | Refund duplicate charges, post a #billing summary | Legit repeat purchase, failed-then-retried charge, no PII in chat |
 | `failed_payment_tickets_102` | Open tickets for customers with 3+ failures in March | Existing open ticket, closed ticket, February failures |
 | `refund_request_tickets_103` | Apply a refund policy to the ticket queue | Too-old payment, already refunded, closed and unrelated tickets |
+| `q1_vip_escalation_104` | Escalate Q1 VIPs, close duplicate tickets | Quarter boundaries, refunded/failed spend, case-sensitive titles |
+| `refund_policy_v2_105` | Stacked refund policy | Prior-credit rule, one refund per customer per batch, 14-day boundary |
 
-**First model evaluation:** Qwen3.8-27B solved 9/10 tasks. On `invoice_sort_001`, the static gate
-caught an f-string SQL fix that the tests alone would have accepted. See
+**Model evaluations:** Qwen3.8-27B solved 9/10 of the first tasks. On `invoice_sort_001`, the static
+gate caught an f-string SQL fix that the tests alone would have accepted. On the harder set,
+gpt-oss-120b fixed only the reported half of `inventory_reservation_009`. See
 [results/evals/](results/evals/README.md).
 
 See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
@@ -105,8 +112,8 @@ environments under `environments/`:
 
 | Package | Tasks | Harness | Runtime | `vf-validate` |
 |---|---|---|---|---|
-| `secops_gym_patches` | 7 patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 7/7 valid |
-| `secops_gym_workflows` | 3 MCP workflows | tool-only chat | subprocess + Postgres | 3/3 valid |
+| `secops_gym_patches` | 11 patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 11/11 valid |
+| `secops_gym_workflows` | 5 MCP workflows | tool-only chat | subprocess + Postgres | 5/5 valid |
 
 ```bash
 uv sync --extra mcp --extra envs              # Linux / macOS / WSL (verifiers is Unix-only)

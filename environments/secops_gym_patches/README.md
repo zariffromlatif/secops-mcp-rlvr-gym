@@ -1,8 +1,9 @@
 # secops-gym-patches
 
-Fix a bug in a small FastAPI + PostgreSQL service. There are 7 tasks: 3 security (SQL built from
-request params, cross-tenant access, missing authentication) and 4 business-logic (pagination
-off-by-one, split rounding, time zones, JOIN double counting).
+Fix bugs in a small FastAPI + PostgreSQL service. There are 11 tasks: 3 security (SQL built from
+request params, cross-tenant access, missing authentication) and 8 business-logic (pagination,
+split rounding, time zones, JOIN double counting, and four harder multi-bug tasks: proration,
+inventory reservations, graduated pricing, idempotency keys).
 
 **How a rollout works**
 - Each rollout gets its own container (`secops-gym-task` image) with the service in `/app` and a
@@ -24,7 +25,7 @@ off-by-one, split rounding, time zones, JOIN double counting).
 
 The per-gate values and `solved` are recorded as metrics.
 
-**Validation** (`vf-validate`, Docker runtime): 7/7 valid. Every gold patch solves its task, and
+**Validation** (`vf-validate`, Docker runtime): 11/11 valid. Every gold patch solves its task, and
 no untouched task passes (untouched rewards are 0.33–0.50, from regression credit only).
 
 ## Run
@@ -33,7 +34,7 @@ no untouched task passes (untouched rewards are 0.33–0.50, from regression cre
 # the default image ghcr.io/zariffromlatif/secops-gym-task:0.1 is public; or build it locally:
 sh scripts/build_task_image.sh
 uv run vf-validate secops_gym_patches --runtime.type docker
-uv run vf-eval secops_gym_patches --runtime.type docker -n 7 --model <model>
+uv run vf-eval secops_gym_patches --runtime.type docker -n 11 --model <model>
 ```
 
 Options: `--env.taskset.categories '["security"]'`, `--env.taskset.image <another tag>`.

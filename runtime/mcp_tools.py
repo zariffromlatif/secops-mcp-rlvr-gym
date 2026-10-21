@@ -28,7 +28,8 @@ def _jsonable(value):
 def sql_query(conn, query: str) -> list[dict]:
     """Run a read-only SQL query (SELECT or WITH) and return up to 200 rows.
 
-    Tables: customers, payments, ledger_credits, tickets, messages.
+    Tables: customers, payments, ledger_credits, tickets, messages. Status values are lowercase
+    (payments: 'succeeded' / 'failed' / 'refunded'; tickets: 'open' / 'closed'). Timestamps are UTC.
     """
     head = query.strip().split(None, 1)[0].lower() if query.strip() else ""
     if head not in {"select", "with"} or ";" in query.strip().rstrip(";"):

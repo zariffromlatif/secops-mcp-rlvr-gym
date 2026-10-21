@@ -125,6 +125,22 @@ tests pass), while customers with multi-payment invoices must show the true tota
 **Learn:** how JOINs multiply rows, `EXISTS`, and the habit of asking "how many rows does this
 JOIN produce?" before aggregating.
 
+## 2b. The harder business-logic tasks (008–011)
+
+These follow one pattern: **the bug report describes one symptom, but the code has two
+problems**, both covered by rules documented at the top of `app/main.py`. Public tests pass with
+both bugs present. To get full marks, the agent has to read the spec, not just the report.
+
+| Task | Reported symptom | Hidden second problem | What to learn |
+|---|---|---|---|
+| `subscription_proration_008` | February plan change is wrong | the code assumes 30-day months **and** rounds down instead of half-up | real period length `(end - start).days`, `Decimal.quantize(ROUND_HALF_UP)`, leap years |
+| `inventory_reservation_009` | same SKU on two lines oversells | releasing an order twice restores stock twice | aggregate before checking; make operations **idempotent** (`UPDATE ... WHERE status = 'active' RETURNING`) |
+| `tiered_pricing_010` | 1,000 units priced wrong | charges every unit at the final tier's price instead of graduated tiers | inclusive vs exclusive bounds; graduated pricing, as on real SaaS pricing pages |
+| `idempotency_keys_011` | retry with a changed amount returns the old payment | keys are shared across tenants | the idempotency-key pattern used by Stripe and others; scoping keys per tenant |
+
+In the first evaluation, gpt-oss-120b fixed the reported half of task 009 and missed the
+idempotency rule. That's exactly the failure these tasks are designed to catch.
+
 ## 3. The MCP workflow tasks
 
 These are different from patch tasks. The agent doesn't edit code: it **operates tools**, like
@@ -162,6 +178,20 @@ happen through the official tools, which check their inputs (you can't refund a 
 
 **Learn:** SQL `GROUP BY` / `HAVING` (task 102), `EXISTS` (task 101), date ranges (102, 103),
 and thinking about edge cases before acting.
+
+**Harder workflows:**
+- `q1_vip_escalation_104` combines an aggregation with a filter and an ordering. The traps:
+  - refunded or failed payments counted as spend;
+  - payments just outside the quarter (31 Dec 23:50, 1 Apr 00:10);
+  - a big spender with only closed tickets;
+  - "invoice copy needed" vs "Invoice copy needed", which are not duplicates.
+- `refund_policy_v2_105` stacks five policy rules, including "at most one refund per customer
+  per batch" (refund the newest payment, deny the rest).
+
+**A lesson from building them:** our first version didn't say that status values are lowercase.
+A model searched for `'OPEN'`, found nothing, and failed for a reason that had nothing to do with
+reasoning. A good task tests a skill, not a hidden convention. When a model fails, check whether
+the task was fair before blaming the model.
 
 ## 4. The security tasks (written earlier)
 

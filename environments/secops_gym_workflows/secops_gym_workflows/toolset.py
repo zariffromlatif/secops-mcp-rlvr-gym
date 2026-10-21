@@ -69,6 +69,8 @@ class CompanyToolset(vf.Toolset[vf.ToolsetConfig, WorkflowState]):
         webhook_id, created_at), ledger_credits(id, customer_id, payment_id, amount_cents, reason),
         tickets(id, customer_id, title, body, status, linked_payment_id, resolution),
         messages(id, channel, text).
+        Values are lowercase: payments.status is 'succeeded', 'failed' or 'refunded';
+        tickets.status is 'open' or 'closed'. Timestamps are UTC.
         """
         return self._call("sql_query", query=query)
 

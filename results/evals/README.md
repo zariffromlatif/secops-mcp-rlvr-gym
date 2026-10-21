@@ -49,6 +49,34 @@ this folder, and the raw traces are in `traces/`.
    tokens per day per model, and one patch episode costs 25–35K tokens. Proper solve rates
    (≥ 3 attempts per task) need several days of quota, or a paid or local endpoint.
 
+## Round 2: harder tasks (2026-10-21)
+
+These tasks were built so that one fix is not enough. Each has several interacting rules, a bug
+report that names only one symptom, and public tests that pass with the bug still present.
+
+| Task | Qwen3.8-27B | gpt-oss-120b |
+|---|---|---|
+| `subscription_proration_008` | — (provider limits) | ✅ 1.00 |
+| `inventory_reservation_009` | — (provider limits) | **0.75, not solved**: fixed the reported oversell, never made `release` idempotent |
+| `tiered_pricing_010` | — (provider limits) | ✅ 1.00 |
+| `idempotency_keys_011` | ✅ 1.00 | ✅ 1.00 |
+| `q1_vip_escalation_104` | not run (quota) | ✅ 1.00, every trap avoided |
+| `refund_policy_v2_105` | not run (quota) | 0.00, **excluded** (see below) |
+
+**What this shows**
+- `inventory_reservation_009` works as designed. The model fixed exactly what the bug report
+  described and ignored the second documented rule. "Read the whole spec" is a real, trainable gap.
+- Most harder tasks are still solved by gpt-oss-120b, so more discriminating tasks are needed.
+  The useful ones so far are `invoice_sort_001` (static gate) and `inventory_reservation_009`
+  (partial fix).
+- **A fairness bug, found and fixed.** On `refund_policy_v2_105`, gpt-oss-120b filtered
+  `status = 'OPEN'` (the prompt wrote OPEN in capitals), got 0 rows, and reported 0 requests. The
+  tool description never listed the stored values, so this measured a hidden convention, not
+  reasoning. The `sql_query` description now documents the lowercase status values. This attempt
+  is excluded and must be re-run.
+- Groq's free tier limits are a **rolling 24-hour window**, not a daily reset. Qwen's attempts
+  failed on quota even after a small test request succeeded.
+
 ## Reproduce
 
 ```bash
