@@ -33,7 +33,7 @@ Payment rails:
 ## 2. Advisor outreach
 
 This project is an independent research paper, not a course thesis. The current proposal and
-advisor email live outside this public repo (E:\Thesis); the research plan is summarized in
+advisor email live outside this public repo (E:\Research_Paper); the research plan is summarized in
 results/evals/README.md.
 
 ## 3. CV top block
