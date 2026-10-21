@@ -30,29 +30,11 @@ Payment rails:
 - **micro1:** "Do you pay through Deel, and which withdrawal methods are available in Bangladesh
   (Payoneer, local bank)?"
 
-## 2. Supervisor email
+## 2. Advisor outreach
 
-> Subject: CSE400 thesis topic: deterministic verifiers vs LLM judges for RL training of code agents
->
-> Dear [Supervisor name],
->
-> I would like to propose the following topic for my CSE400 thesis this semester:
-> "Preventing reward hacking in RL post-training of code agents: multi-signal deterministic
-> verifiers vs LLM-as-a-judge rewards."
->
-> I am building a set of small, containerized FastAPI + PostgreSQL tasks where a model must fix a
-> security flaw. Each fix is scored by functional tests, hidden security tests, and static
-> analysis. I plan to train a small open model (Qwen3-4B) with GRPO under three reward settings
-> (LLM judge, public tests only, full deterministic verifier) and compare held-out fix rates and
-> how often the model games the reward.
->
-> I would like to release the code as open source. Could you let me know:
-> 1. Whether this topic fits the CSE400 scope and timeline.
-> 2. Whether open-sourcing the code (and using it in freelance work) causes any issue.
-> 3. Any milestones or report deadlines I should plan around.
->
-> Thank you,
-> [Your name], [Student ID]
+This project is an independent research paper, not a course thesis. The current proposal and
+advisor email live outside this public repo (E:\Thesis); the research plan is summarized in
+results/evals/README.md.
 
 ## 3. CV top block
 

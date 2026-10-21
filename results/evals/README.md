@@ -37,7 +37,7 @@ this folder, and the raw traces are in `traces/`.
    allow-list check, so the hidden security tests pass and the endpoint is safe in practice. But
    both kept building SQL with an f-string, which the task explicitly forbids. With tests alone,
    this would count as solved. Only the AST gate tells "safe by validation" apart from "safe by
-   construction". This is the core argument of the thesis (multi-signal deterministic verifiers vs
+   construction". This is the core argument of the paper (multi-signal deterministic verifiers vs
    test-only or LLM-judge rewards).
 2. **Most tasks are too easy for a 27B model.** For GRPO, a task the model always solves gives zero
    advantage, so no learning signal. The next tasks should be harder: multi-file changes, subtler

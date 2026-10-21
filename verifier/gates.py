@@ -1,7 +1,7 @@
 """Multi-gate reward for security remediation tasks.
 
 Each gate returns a float. `score` combines them into a total plus a per-gate
-breakdown so training logs and thesis analysis can see which gate moved.
+breakdown so training logs and later analysis can see which gate moved.
 """
 
 from __future__ import annotations
