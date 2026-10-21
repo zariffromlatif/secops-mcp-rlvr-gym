@@ -130,7 +130,7 @@ with the **publish-task-image** GitHub Action). Push each environment from its f
 `prime` CLI (`prime login`, then `prime env push --visibility PRIVATE` from the environment
 folder). On Windows, set `PYTHONUTF8=1` first or the CLI crashes printing status symbols.
 
-Hub (private, v0.1.0): `zariffromlatif/secops-gym-patches`, `zariffromlatif/secops-gym-workflows`.
+Hub (private, v0.2.0): `zariffromlatif/secops-gym-patches`, `zariffromlatif/secops-gym-workflows`.
 
 ## Sandbox
 

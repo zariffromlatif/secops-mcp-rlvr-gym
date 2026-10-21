@@ -1,6 +1,6 @@
 [project]
 name = "secops-gym-patches"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fix security and business-logic bugs in small FastAPI + Postgres services; graded by hidden tests in an isolated box."
 requires-python = ">=3.11"
 dependencies = ["verifiers>=0.4", "pyyaml>=6.0"]
