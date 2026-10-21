@@ -53,6 +53,18 @@ def retry_delay(response: httpx.Response, attempt: int) -> float:
     return min(2 ** attempt, 30)
 
 
+def daily_quota_exhausted(response: httpx.Response) -> bool:
+    """A per-day limit (Groq: "tokens per day (TPD)") with a long wait, as opposed to a per-minute one."""
+    text = response.text
+    if "per day" not in text:
+        return False
+    wait = re.search(r"try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", text)
+    if not wait:
+        return True
+    hours, minutes, seconds = (float(g) if g else 0.0 for g in wait.groups())
+    return hours * 3600 + minutes * 60 + seconds > 120
+
+
 async def proxy(request: Request) -> Response:
     path = request.url.path.removeprefix("/v1")
     raw = await request.body()
@@ -66,6 +78,10 @@ async def proxy(request: Request) -> Response:
         response = await client.send(upstream, stream=True)
         if response.status_code == 429 or response.status_code >= 500:
             await response.aread()
+            if daily_quota_exhausted(response):
+                # Waiting minutes per request would stall a whole run; fail now and resume another day.
+                print(f"[proxy] daily quota exhausted on {path}; not retrying", flush=True)
+                return Response(response.content, response.status_code, media_type="application/json")
             if attempt + 1 < MAX_ATTEMPTS:
                 delay = retry_delay(response, attempt)
                 print(f"[proxy] {response.status_code} on {path}, retrying in {delay:.1f}s", flush=True)
