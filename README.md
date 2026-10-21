@@ -58,6 +58,7 @@ workflows/    MCP workflow tasks (seed, prompt, hidden state checks, trajectorie
 environments/ Prime Intellect verifiers packages wrapping both task families
 verifier/     multi-gate reward function
 runtime/      Docker sandbox and episode runner
+audit/        verifier audit: collect solutions, V1-V4 verdicts, blind labeling, analysis
 scripts/      sync, image build, eval runner, results summarizer, Linux devbox
 results/      model evaluation results and raw traces
 docs/         study guide and planning notes
@@ -136,6 +137,31 @@ with the **publish-task-image** GitHub Action). Push each environment from its f
 folder). On Windows, set `PYTHONUTF8=1` first or the CLI crashes printing status symbols.
 
 Hub (private, v0.2.1): `zariffromlatif/secops-gym-patches`, `zariffromlatif/secops-gym-workflows`.
+
+## Verifier audit (the paper's measurement pipeline)
+
+`audit/` re-scores every agent solution with four verifiers and compares them with blind human
+labels:
+
+| Verifier | Patch tasks | Workflows |
+|---|---|---|
+| V1 | public tests only | goal checks only |
+| V2 | public + hidden tests | (none) |
+| V3 | multi-signal: V2 + static analysis + format/tamper gates | goal + guard checks |
+| V4 | LLM judge (task, original code, diff) | LLM judge (task, tool calls + results) |
+
+```bash
+uv run python -m audit.collect .tmp/evals/<run> ... --out results/audit/solutions.jsonl
+uv run python -m audit.verify results/audit/solutions.jsonl --judge-model openai/gpt-oss-20b
+uv run python -m audit.labels results/audit/solutions.jsonl --out results/audit/labeling
+#   two annotators fill sheet_A.csv / sheet_B.csv independently (see GUIDELINES.md)
+uv run python -m audit.analyze results/audit/verdicts.csv results/audit/labeling
+```
+
+The analysis reports Cohen's kappa between annotators and, per verifier, false-positive and
+false-negative rates with 95% bootstrap confidence intervals. Judge answers are cached, so
+re-running never spends quota twice. The judge and the annotators see the same full tool results
+the agent saw.
 
 ## Sandbox
 

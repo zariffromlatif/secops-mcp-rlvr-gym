@@ -23,7 +23,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp
       - name: Unit tests (no database)
-        run: uv run pytest -q verifier tests/test_summarize_evals.py
+        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py
       - name: Patch tasks score as expected in the Docker sandbox (3 runs each)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)

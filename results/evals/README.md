@@ -77,6 +77,19 @@ report that names only one symptom, and public tests that pass with the bug stil
 - Groq's free tier limits are a **rolling 24-hour window**, not a daily reset. Qwen's attempts
   failed on quota even after a small test request succeeded.
 
+## First verifier-audit data (2026-10-21)
+
+The 5 workflow solutions above were re-scored with V1, V3 and an LLM judge (V4, gpt-oss-20b).
+See `results/audit/verdicts.csv`. Patch solutions from these runs can't be re-scored, because
+they predate the environment saving final code (0.2.1).
+
+- **Judge false positive on `refund_policy_v2_105`.** The agent processed 0 requests (a wrong-case
+  status filter). The judge accepted "no eligible tickets were found" without checking; V3
+  correctly failed it.
+- **A methodology lesson.** A first judge run truncated tool results to 800 characters, and that
+  produced two spurious judge errors (e.g. payment 17 sat beyond the cut). Judges and annotators
+  now see the full results the agent saw. The paper must document how judge inputs are built.
+
 ## Reproduce
 
 ```bash
