@@ -26,3 +26,7 @@ sh scripts/devbox.sh sh -c "
     sleep 3
     uv run --no-sync $EVAL $* 2>&1 | grep -vE 'deprecated|prime-rl|Trace push|PRIME_API_KEY|mode=.disabled|live into a dashboard'
 "
+# Interrupted workflow rollouts can leave their episode databases behind.
+if [ "$ENV" = "workflows" ] || [ "$ENV" = "resume" ]; then
+    uv run python runtime/workflows.py cleanup >/dev/null 2>&1 || true
+fi

@@ -19,11 +19,11 @@ jobs:
           --health-interval 2s
           --health-retries 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp
-      - name: Verifier unit tests
-        run: uv run pytest -q verifier
+      - name: Unit tests (no database)
+        run: uv run pytest -q verifier tests/test_summarize_evals.py
       - name: Patch tasks score as expected in the Docker sandbox (3 runs each)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
@@ -48,9 +48,11 @@ jobs:
           --health-interval 2s
           --health-retries 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp --extra envs
+      - name: Tool safety and workflow scoring tests
+        run: uv run pytest -q tests
       - name: Build task image
         run: sh scripts/build_task_image.sh
       - name: vf-validate secops_gym_patches (gold + noop, Docker runtime)

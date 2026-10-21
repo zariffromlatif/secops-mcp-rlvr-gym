@@ -1,11 +1,16 @@
 # secops-mcp-rlvr-gym
 
 Containerized RLVR (Reinforcement Learning with Verifiable Rewards) environments for training and
-evaluating code agents on backend security remediation in FastAPI + PostgreSQL services.
+evaluating agents on two kinds of work:
 
-An agent receives a small service with a known security flaw and a bug report, and must return a
-patch. The patch is scored by deterministic checks the agent never sees during its rollout, so the
-reward cannot be gamed by editing tests or special-casing inputs.
+- **Code repair:** an agent gets a small FastAPI + PostgreSQL service with a security flaw or a
+  business-logic bug, plus a bug report, and must fix it.
+- **Tool use (MCP):** an agent operates a mock company's payments, ledger, ticketing and chat
+  tools to carry out a policy.
+
+Every solution is scored by deterministic checks the agent never sees during its rollout: hidden
+tests, static analysis, and checks on the final database state. Editing tests, special-casing
+inputs or collateral damage cannot earn reward.
 
 ## Status
 
@@ -53,9 +58,9 @@ workflows/    MCP workflow tasks (seed, prompt, hidden state checks, trajectorie
 environments/ Prime Intellect verifiers packages wrapping both task families
 verifier/     multi-gate reward function
 runtime/      Docker sandbox and episode runner
-training/     GRPO training and evaluation scripts
-thesis/       experiment configs and result CSVs
-docs/         planning notes
+scripts/      sync, image build, eval runner, results summarizer, Linux devbox
+results/      model evaluation results and raw traces
+docs/         study guide and planning notes
 ```
 
 ## Reward gates
@@ -65,7 +70,7 @@ docs/         planning notes
 | Format | -0.5 to +0.2 | Patch applies, Python parses, no edits to tests |
 | Regression | +0.8 | Functional test suites pass |
 | Target / security | +1.5 | Hidden tests that only pass once the bug is fixed |
-| Static analysis | +0.5 | Parameterized queries, auth dependencies present |
+| Static analysis | +0.5 | No SQL built from runtime strings (f-strings, `+`, `%`, `.format`) |
 
 Every task ships a `gold.patch` (must be solved, normalized score 1.0) and a `noop.patch` (must be
 unsolved with a security score of 0). Patches that edit test files score -0.5.

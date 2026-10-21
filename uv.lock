@@ -2994,7 +2994,7 @@ wheels = [
 
 [[package]]
 name = "secops-gym-patches"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "environments/secops_gym_patches" }
 dependencies = [
     { name = "pyyaml" },
@@ -3009,7 +3009,7 @@ requires-dist = [
 
 [[package]]
 name = "secops-gym-workflows"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "environments/secops_gym_workflows" }
 dependencies = [
     { name = "psycopg", extra = ["binary"] },

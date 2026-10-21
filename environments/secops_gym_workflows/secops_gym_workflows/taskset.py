@@ -53,6 +53,8 @@ class WorkflowTask(vf.Task[WorkflowData, WorkflowState, WorkflowTaskConfig]):
             finally:
                 episodes.drop_episode_db(db_name)
         trace.state.score = score.normalized
+        # Saved with the trace; the tool calls themselves are already in it, so episodes can be replayed.
+        trace.info["secops_gym"] = {"goal": score.goal, "guard": score.guard, "reward": score.reward}
         metrics = {f"goal_{k}": float(v) for k, v in score.goal.items()}
         metrics |= {f"guard_{k}": float(v) for k, v in score.guard.items()}
         return metrics | {"solved": float(score.solved)}

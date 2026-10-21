@@ -21,7 +21,7 @@ mcp = ["mcp>=1.2"]
 envs = ["secops-gym-patches", "secops-gym-workflows"]
 
 [tool.pytest.ini_options]
-testpaths = ["verifier"]
+testpaths = ["verifier", "tests"]
 
 [tool.uv.sources]
 secops-gym-patches = { path = "environments/secops_gym_patches", editable = true }

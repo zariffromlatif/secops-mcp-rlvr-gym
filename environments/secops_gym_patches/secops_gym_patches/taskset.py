@@ -77,6 +77,10 @@ class PatchTask(vf.Task[PatchData, PatchState]):
         await _run(runtime, ["chown", "-R", "agent:agent", "/app"])
 
     async def _score(self, runtime: vf.Runtime) -> gates.RewardBreakdown:
+        return (await self._evaluate(runtime))[0]
+
+    async def _evaluate(self, runtime: vf.Runtime) -> tuple[gates.RewardBreakdown, dict]:
+        """Run the in-box scorer; return the gate breakdown and the scorer's raw output."""
         scoring = yaml.safe_load((self.task_dir / "task.yaml").read_text())["scoring"]
         for rel, content in _files(self.task_dir, "hidden").items():
             await runtime.write(f"{BOX}/task/{rel}", content)
@@ -92,18 +96,26 @@ class PatchTask(vf.Task[PatchData, PatchState]):
         await runtime.write(f"{BOX}/task/spec.json", json.dumps(spec).encode())
         result = await _run(runtime, ["python", f"{BOX}/score_box.py", f"{BOX}/task/spec.json"])
         out = json.loads(result.stdout.strip().splitlines()[-1])
-        return gates.score(
+        breakdown = gates.score(
             changed_files=out["app_files"],
             touched_paths=out["tests_modified"] + list(out["app_files"]),
             app_files=out["app_files"],
             regression=tuple(out["regression"]),
             security=tuple(out["security"]),
         )
+        return breakdown, out
 
     @vf.metric
     async def breakdown(self, trace: vf.Trace, runtime: vf.Runtime) -> dict:
-        r = await self._score(runtime)
+        r, out = await self._evaluate(runtime)
         trace.state.gym = {"normalized": r.normalized, "notes": r.notes}
+        # Saved with the trace so any verifier can re-score this solution later.
+        trace.info["secops_gym"] = {
+            "final_app_files": out["app_files"],
+            "tests_modified": out["tests_modified"],
+            "test_counts": {"regression": out["regression"], "target": out["security"]},
+            "notes": r.notes,
+        }
         return {
             "gate_format": r.format,
             "gate_regression": r.regression,
