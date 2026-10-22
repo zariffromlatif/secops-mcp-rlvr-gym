@@ -132,13 +132,19 @@ class Judge:
         if not self.cache.exists():
             return {}
         rows = (json.loads(line) for line in self.cache.read_text(encoding="utf-8").splitlines() if line.strip())
-        return {row["key"]: row for row in rows}
+        # Replies without a verdict are not cached answers; ask again next time.
+        return {row["key"]: row for row in rows if row.get("verdict") is not None}
 
     def _key(self, prompt: str) -> str:
         return hashlib.sha256(f"{self.model}\n{prompt}".encode()).hexdigest()
 
-    def _complete(self, prompt: str) -> dict:
-        body = {"model": self.model, "temperature": 0, "messages": [{"role": "user", "content": prompt}]}
+    def _complete(self, prompt: str, **options) -> dict:
+        # Reasoning models spend most of the reply on hidden reasoning; Groq's default cap (2048) cut
+        # the verdict off. Groq counts this budget toward its 8K-tokens-per-minute request limit, so
+        # leave room for the prompt (~3 characters per token, rounded down).
+        budget = max(2048, 7600 - len(prompt) // 3)
+        body = {"model": self.model, "temperature": 0, "max_completion_tokens": budget,
+                "messages": [{"role": "user", "content": prompt}], **options}
         for attempt in range(self.max_attempts):
             r = httpx.post(f"{self.base_url}/chat/completions", json=body, timeout=120,
                            headers={"Authorization": f"Bearer {self.api_key}"})
@@ -159,7 +165,8 @@ class Judge:
             verdict, reason = parse_verdict(reply["text"])
             retried = verdict is None
             if retried:  # e.g. a reasoning model that spent its reply on hidden reasoning
-                reply = self._complete(prompt + RETRY_SUFFIX)
+                # Some replies reason until the budget runs out; the retry asks for brief reasoning.
+                reply = self._complete(prompt + RETRY_SUFFIX, reasoning_effort="low")
                 verdict, reason = parse_verdict(reply["text"])
             row = {"key": key, "model": self.model, "verdict": verdict, "reason": reason,
                    "retried": retried, "usage": reply["usage"]}
