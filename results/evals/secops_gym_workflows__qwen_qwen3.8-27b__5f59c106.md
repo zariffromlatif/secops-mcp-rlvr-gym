@@ -1,0 +1,12 @@
+# secops_gym_workflows · qwen/qwen3.8-27b
+
+Source run: `secops_gym_workflows--qwen--qwen3.8-27b--secops_gym_workflows--5f59c106`
+
+| task | attempts | errored | solved | solve_rate | mean_reward |
+|---|---|---|---|---|---|
+| duplicate_webhook_refunds_101 | 1 | 0 | 1 | 1.0 | 1.0 |
+| failed_payment_tickets_102 | 1 | 0 | 1 | 1.0 | 1.0 |
+| q1_vip_escalation_104 | 1 | 0 | 1 | 1.0 | 1.0 |
+| refund_policy_v2_105 | 1 | 0 | 0 | 0.0 | 0.0 |
+| refund_request_tickets_103 | 1 | 0 | 1 | 1.0 | 1.0 |
+| ALL | 5 | 0 | 4 | 0.8 | 0.8 |

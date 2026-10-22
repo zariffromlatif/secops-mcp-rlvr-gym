@@ -1,0 +1,13 @@
+task,attempts,errored,solved,solve_rate,mean_reward,gate_regression,gate_target
+daily_report_timezone_006,1,0,1,1.0,1.0,0.8,1.5
+idempotency_keys_011,1,0,1,1.0,1.0,0.8,1.5
+inventory_reservation_009,1,1,0,,,,
+invoice_sort_001,1,1,0,,,,
+invoice_split_rounding_005,1,1,0,,,,
+invoice_tenant_002,1,1,0,,,,
+orders_pagination_004,1,1,0,,,,
+report_auth_003,1,1,0,,,,
+revenue_double_count_007,1,1,0,,,,
+subscription_proration_008,1,1,0,,,,
+tiered_pricing_010,1,1,0,,,,
+ALL,11,9,2,1.0,1.0,0.8,1.5
