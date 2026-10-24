@@ -1,0 +1,25 @@
+id: ledger_reconciliation_106
+category: mcp-workflow
+difficulty: hard
+max_steps: 30
+tools: [sql_query, issue_refund, create_ticket, post_message]
+prompt: |
+  You are a finance operations agent. Finance suspects that the payments table and the ledger
+  disagree. Compare them and report every mismatch. Do NOT fix anything yourself: do not issue
+  refunds or move any money.
+
+  A payment is a mismatch if one of these is true:
+  - "missing credit": its status is 'refunded' but it has no ledger credit at all.
+  - "amount mismatch": it has ledger credits, but their TOTAL differs from the payment amount.
+  - "credit without refund": its status is 'succeeded' but it has at least one ledger credit.
+  A payment can have several ledger credits; only their total matters.
+
+  For each mismatch, open a ticket for the payment's customer, linked to that payment, titled
+  exactly "Ledger: missing credit", "Ledger: amount mismatch" or "Ledger: credit without refund",
+  with a short body. Skip it if an OPEN ticket with the same title already links that payment
+  (a closed ticket does not count).
+
+  Finally post one message in #finance:
+  "Reconciliation: <A> missing credit, <B> amount mismatch, <C> credit without refund."
+  where A, B and C count all mismatches found, including those that already had a ticket.
+  Do not include any customer contact details in chat.

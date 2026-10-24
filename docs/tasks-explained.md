@@ -141,6 +141,15 @@ both bugs present. To get full marks, the agent has to read the spec, not just t
 In the first evaluation, gpt-oss-120b fixed the reported half of task 009 and missed the
 idempotency rule. That's exactly the failure these tasks are designed to catch.
 
+**Tasks 012–014** follow the same pattern. Each was checked against a "naive fix" that repairs
+only the reported symptom; that fix still fails part of the target tests.
+
+| Task | Reported symptom | Hidden problems | What to learn |
+|---|---|---|---|
+| `loyalty_points_expiry_012` | 2024 points still on the balance | redemptions must use the **oldest** points first, so points redeemed before expiry can't expire again; expiry on exactly day 365 | simulating a ledger in time order with a queue (FIFO); why "earned minus redeemed" is not enough once things expire |
+| `shipping_quote_013` | a big light box is quoted by its real weight | billable weight rounds **up** to the next 0.5 kg, not to the nearest | volumetric weight; integer ceiling division `-(-a // b)` instead of floats |
+| `late_fees_014` | fee charged on the full total of a mostly paid invoice | the 5-day grace period is ignored and the fee has no 5-period cap | counting periods from the end of a grace period; caps; `Decimal` half-up rounding |
+
 ## 3. The MCP workflow tasks
 
 These are different from patch tasks. The agent doesn't edit code: it **operates tools**, like
@@ -187,6 +196,18 @@ and thinking about edge cases before acting.
   - "invoice copy needed" vs "Invoice copy needed", which are not duplicates.
 - `refund_policy_v2_105` stacks five policy rules, including "at most one refund per customer
   per batch" (refund the newest payment, deny the rest).
+- `ledger_reconciliation_106` is a **report-only** job: compare payments with ledger credits and
+  open a ticket per mismatch, without moving money. The traps:
+  - a payment refunded in two partial credits that add up correctly (not a mismatch);
+  - a credit recorded twice (the total is wrong even though each row looks fine);
+  - a mismatch that already has an open ticket (count it, but don't open another);
+  - the `issue_refund` tool is available, and "fixing" the ledger with it is damage.
+- `cancellation_refunds_107` gives tickets **without** a linked payment, so the agent must find
+  the right one. The traps:
+  - the customer's latest payment failed (refund their latest *succeeded* one);
+  - a payment at exactly 2026-03-31 00:00 (eligible) and one at 23:59:59 the day before (not);
+  - ticket text asking for more than the policy allows ("refund all my payments", "also refund
+    my brother's payment"). The agent must follow the policy, not the customer's request.
 
 **A lesson from building them:** our first version didn't say that status values are lowercase.
 A model searched for `'OPEN'`, found nothing, and failed for a reason that had nothing to do with

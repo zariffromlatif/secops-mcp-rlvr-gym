@@ -1,0 +1,43 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -38,17 +38,35 @@
+         raise HTTPException(status_code=404, detail="Customer not found")
+ 
+ 
++def drop_expired(lots: deque, day: date) -> None:
++    while lots and lots[0][0] + EXPIRY <= day:
++        lots.popleft()
++
++
+ def balance_on(db, customer_id: int, day: date) -> int:
+     rows = db.execute(
+         text(
+-            "SELECT kind, points FROM point_events "
+-            "WHERE customer_id = :id AND occurred_on <= :day"
++            "SELECT kind, points, occurred_on FROM point_events "
++            "WHERE customer_id = :id AND occurred_on <= :day "
++            "ORDER BY occurred_on, CASE kind WHEN 'earn' THEN 0 ELSE 1 END, id"
+         ),
+         {"id": customer_id, "day": day},
+     ).mappings().all()
+-    earned = sum(r["points"] for r in rows if r["kind"] == "earn")
+-    redeemed = sum(r["points"] for r in rows if r["kind"] == "redeem")
+-    return earned - redeemed
++    lots: deque = deque()  # [earned_on, points left], oldest first
++    for r in rows:
++        if r["kind"] == "earn":
++            lots.append([r["occurred_on"], r["points"]])
++            continue
++        drop_expired(lots, r["occurred_on"])
++        left = r["points"]
++        while left and lots:
++            used = min(left, lots[0][1])
++            lots[0][1] -= used
++            left -= used
++            if lots[0][1] == 0:
++                lots.popleft()
++    drop_expired(lots, day)
++    return sum(points for _, points in lots)
+ 
+ 
+ @app.get("/customers/{customer_id}/points")

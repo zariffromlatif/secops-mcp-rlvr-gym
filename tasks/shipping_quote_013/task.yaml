@@ -1,0 +1,19 @@
+id: shipping_quote_013
+category: business-logic
+bug: billable-weight
+difficulty: medium
+editable_paths:
+  - app/
+prompt: |
+  You are working on a small FastAPI shipping-quote service backed by PostgreSQL. The pricing
+  rules are documented at the top of app/main.py.
+
+  Bug report from the warehouse: "A 1 kg box of pillows measuring 40 x 40 x 40 cm was quoted
+  300 cents to Dhaka. The courier charged us 3,900."
+
+  Fix the quote so that it follows ALL of the documented pricing rules.
+
+  You may run the tests in tests_public/. Do not modify test files.
+scoring:
+  regression: [tests_public, hidden/test_regression_hidden.py]
+  target: [hidden/test_target.py]

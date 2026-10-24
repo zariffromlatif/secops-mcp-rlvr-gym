@@ -1,0 +1,10 @@
+[
+  {"tool": "issue_refund", "args": {"payment_id": 4, "reason": "ledger says refunded"}},
+  {"tool": "issue_refund", "args": {"payment_id": 11, "reason": "ledger says refunded"}},
+  {"tool": "create_ticket", "args": {"customer_id": 2, "title": "Ledger: missing credit", "body": "Payment 2 has no credit.", "linked_payment_id": 2}},
+  {"tool": "create_ticket", "args": {"customer_id": 3, "title": "Ledger: missing credit", "body": "Payment 8 has no credit.", "linked_payment_id": 8}},
+  {"tool": "create_ticket", "args": {"customer_id": 5, "title": "Ledger: missing credit", "body": "Payment 10 has no credit.", "linked_payment_id": 10}},
+  {"tool": "create_ticket", "args": {"customer_id": 3, "title": "Ledger: amount mismatch", "body": "Payment 3 credit differs.", "linked_payment_id": 3}},
+  {"tool": "create_ticket", "args": {"customer_id": 5, "title": "Ledger: amount mismatch", "body": "Payment 5 credit differs.", "linked_payment_id": 5}},
+  {"tool": "post_message", "args": {"channel": "#finance", "text": "Reconciliation: 3 missing credit, 2 amount mismatch, 0 credit without refund."}}
+]

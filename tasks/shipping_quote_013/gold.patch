@@ -1,0 +1,14 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -41,7 +41,10 @@
+ 
+ def billable_halves(package: Package) -> int:
+     """Billable weight as a number of 0.5 kg steps."""
+-    return max(1, round(package.weight_g / 500))
++    # cm^3 / 5000 is kg, so cm^3 / 5 is grams; round up to whole grams.
++    volumetric_g = -(-(package.length_cm * package.width_cm * package.height_cm) // 5)
++    billable_g = max(package.weight_g, volumetric_g)
++    return max(1, -(-billable_g // 500))
+ 
+ 
+ @app.post("/quotes")

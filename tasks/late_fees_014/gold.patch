@@ -1,0 +1,28 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -41,18 +41,22 @@
+     return int((Decimal(cents) * percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+ 
+ 
++GRACE_DAYS = 5
++MAX_PERIODS = 5
++
++
+ @app.get("/invoices/{invoice_id}/late-fee")
+ def late_fee(invoice_id: str, as_of: date = Query(), db=Depends(get_db)):
+     invoice = load_invoice(db, invoice_id, as_of)
+-    days_late = (as_of - invoice["due_date"]).days
++    days_late = (as_of - invoice["due_date"]).days - GRACE_DAYS
+     if invoice["outstanding"] <= 0 or days_late <= 0:
+         periods = 0
+     else:
+-        periods = math.ceil(days_late / 30)
++        periods = min(math.ceil(days_late / 30), MAX_PERIODS)
+     return {
+         "invoice_id": invoice_id,
+         "as_of": as_of.isoformat(),
+         "outstanding_cents": invoice["outstanding"],
+         "periods": periods,
+-        "fee_cents": percent_of(invoice["total_cents"], 2 * periods),
++        "fee_cents": percent_of(invoice["outstanding"], 2 * periods),
+     }

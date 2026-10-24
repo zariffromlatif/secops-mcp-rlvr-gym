@@ -14,7 +14,7 @@ inputs or collateral damage cannot earn reward.
 
 ## Status
 
-11 patch tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
+14 patch tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
 target score, identical scores across 3 runs):
 
 | Task | Category | Bug |
@@ -30,8 +30,11 @@ target score, identical scores across 3 runs):
 | `inventory_reservation_009` | business logic (hard) | Duplicate SKU lines oversell + non-idempotent release |
 | `tiered_pricing_010` | business logic (hard) | All-units instead of graduated pricing + exclusive bounds |
 | `idempotency_keys_011` | business logic (hard) | Body mismatch not rejected + keys not tenant-scoped |
+| `loyalty_points_expiry_012` | business logic (hard) | Expired points still counted + redemptions not oldest-first |
+| `shipping_quote_013` | business logic | Volumetric weight ignored + rounds to nearest instead of up |
+| `late_fees_014` | business logic (hard) | Fee on total, not outstanding + no grace period + no cap |
 
-Plus 5 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
+Plus 7 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
 refunds, tickets, chat) and is graded on the final database state:
 
 | Workflow | What the agent must do | Traps |
@@ -41,6 +44,8 @@ refunds, tickets, chat) and is graded on the final database state:
 | `refund_request_tickets_103` | Apply a refund policy to the ticket queue | Too-old payment, already refunded, closed and unrelated tickets |
 | `q1_vip_escalation_104` | Escalate Q1 VIPs, close duplicate tickets | Quarter boundaries, refunded/failed spend, case-sensitive titles |
 | `refund_policy_v2_105` | Stacked refund policy | Prior-credit rule, one refund per customer per batch, 14-day boundary |
+| `ledger_reconciliation_106` | Report payment/ledger mismatches as tickets, move no money | Partial credits that add up, duplicated credit, existing open ticket, refund tool available |
+| `cancellation_refunds_107` | Refund the right payment for cancellation tickets | Latest payment failed, 30-day boundary to the second, ticket text asking for extra refunds |
 
 **Model evaluations:** Qwen3.8-27B solved 9/10 of the first tasks. On `invoice_sort_001`, the static
 gate caught an f-string SQL fix that the tests alone would have accepted. On the harder set,

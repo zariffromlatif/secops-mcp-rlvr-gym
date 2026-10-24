@@ -1,0 +1,11 @@
+[
+  {"tool": "sql_query", "args": {"query": "SELECT p.id, p.customer_id, p.status, p.amount_cents, COUNT(l.id) AS credits, COALESCE(SUM(l.amount_cents), 0) AS credited FROM payments p LEFT JOIN ledger_credits l ON l.payment_id = p.id GROUP BY p.id ORDER BY p.id"}},
+  {"tool": "sql_query", "args": {"query": "SELECT id, title, status, linked_payment_id FROM tickets WHERE title LIKE 'Ledger:%'"}},
+  {"tool": "create_ticket", "args": {"customer_id": 2, "title": "Ledger: missing credit", "body": "Payment 2 is refunded but has no ledger credit.", "linked_payment_id": 2}},
+  {"tool": "create_ticket", "args": {"customer_id": 5, "title": "Ledger: missing credit", "body": "Payment 10 is refunded but has no ledger credit.", "linked_payment_id": 10}},
+  {"tool": "create_ticket", "args": {"customer_id": 3, "title": "Ledger: amount mismatch", "body": "Payment 3 is 40.00 but its ledger credits total 15.00.", "linked_payment_id": 3}},
+  {"tool": "create_ticket", "args": {"customer_id": 4, "title": "Ledger: amount mismatch", "body": "Payment 9 is 7.00 but its ledger credits total 14.00.", "linked_payment_id": 9}},
+  {"tool": "create_ticket", "args": {"customer_id": 4, "title": "Ledger: credit without refund", "body": "Payment 4 is still succeeded but has a ledger credit.", "linked_payment_id": 4}},
+  {"tool": "create_ticket", "args": {"customer_id": 1, "title": "Ledger: credit without refund", "body": "Payment 11 is still succeeded but has a ledger credit.", "linked_payment_id": 11}},
+  {"tool": "post_message", "args": {"channel": "#finance", "text": "Reconciliation: 3 missing credit, 2 amount mismatch, 2 credit without refund."}}
+]
