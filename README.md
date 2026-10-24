@@ -53,7 +53,8 @@ gpt-oss-120b fixed only the reported half of `inventory_reservation_009`. See
 [results/evals/](results/evals/README.md).
 
 See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
-write new ones.
+write new ones. To evaluate models served on your own GPU instead of a hosted API, see
+[docs/bracu-pc.md](docs/bracu-pc.md) and `scripts/local_batch.sh`.
 
 ## Layout
 

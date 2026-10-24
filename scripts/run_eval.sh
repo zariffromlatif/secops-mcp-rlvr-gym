@@ -6,11 +6,17 @@
 #
 # Needs GROQ_API_KEY in .env (or set UPSTREAM_BASE_URL / UPSTREAM_API_KEY_VAR for another
 # OpenAI-compatible provider). Results land in .tmp/evals/.
+#
+# A model server on this machine (Ollama, llama.cpp, vLLM) needs no key:
+#   LOCAL_LLM=http://host.docker.internal:11434/v1 sh scripts/run_eval.sh patches local/gpt-oss-20b
 set -e
 cd "$(dirname "$0")/.."
 #   sh scripts/run_eval.sh resume .tmp/evals/<run-dir>     # re-run missing/errored episodes
 ENV="$1"; MODEL="$2"; shift 2
 KEY_VAR="${UPSTREAM_API_KEY_VAR:-GROQ_API_KEY}"
+if [ -n "${LOCAL_LLM:-}" ]; then
+    UPSTREAM_BASE_URL="$LOCAL_LLM"; KEY_VAR=LOCAL_API_KEY
+fi
 case "$ENV" in
     patches)   EVAL="vf-eval secops_gym_patches --env.agent.runtime.type docker --model $MODEL \
                     --client.base-url http://127.0.0.1:8099/v1 --client.api-key-var $KEY_VAR -c 1 -o /work/.tmp/evals" ;;
@@ -21,6 +27,7 @@ case "$ENV" in
 esac
 docker compose -f runtime/docker-compose.yml up -d --wait >/dev/null 2>&1
 sh scripts/devbox.sh sh -c "
+    export LOCAL_API_KEY=\${LOCAL_API_KEY:-local}
     UPSTREAM_BASE_URL='${UPSTREAM_BASE_URL:-https://api.groq.com/openai/v1}' UPSTREAM_API_KEY_VAR=$KEY_VAR \
         uv run --no-sync python scripts/llm_proxy.py >> /work/.tmp/llm_proxy.log 2>&1 &
     sleep 3
