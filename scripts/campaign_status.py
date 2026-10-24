@@ -35,8 +35,10 @@ def run_status(env: str, run_dir: Path) -> dict:
                 message = ((trace.get("errors") or [{}])[0].get("message") or "")
                 errors[task] = ("request too large" if "too large" in message
                                 else "daily quota" if "per day" in message else message[:60] or "error")
-    expected = EXPECTED[env]
-    return {"done": sorted(done & set(expected)),
+    # A run covers the tasks it was started with (every task gets an episode, errored or not),
+    # so tasks added to the repo later don't count against it.
+    expected = sorted(done | set(errors)) or EXPECTED[env]
+    return {"done": sorted(done & set(expected)), "expected": expected,
             "missing": [t for t in expected if t not in done],
             "errors": {t: e for t, e in errors.items() if t not in done}}
 
@@ -55,7 +57,7 @@ def main() -> int:
         s = run_status(env, ROOT / run_dir)
         complete &= not s["missing"]
         missing = ", ".join(f"{t} ({s['errors'].get(t, 'not run yet')})" for t in s["missing"]) or "none"
-        print(f"| {env} | {model} | {len(s['done'])}/{len(EXPECTED[env])} | {missing} |")
+        print(f"| {env} | {model} | {len(s['done'])}/{len(s['expected'])} | {missing} |")
     verdict = "COMPLETE" if complete else "STOPPED" if args.days_run >= args.max_days else "IN PROGRESS"
     print(f"\n{verdict} (day {args.days_run} of at most {args.max_days})")
     return 0
