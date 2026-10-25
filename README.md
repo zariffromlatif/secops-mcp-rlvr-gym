@@ -1,21 +1,64 @@
 # secops-mcp-rlvr-gym
 
-Containerized RLVR (Reinforcement Learning with Verifiable Rewards) environments for training and
-evaluating agents on two kinds of work:
+[![CI](https://github.com/zariffromlatif/secops-mcp-rlvr-gym/actions/workflows/ci.yml/badge.svg)](https://github.com/zariffromlatif/secops-mcp-rlvr-gym/actions/workflows/ci.yml)
 
-- **Code repair:** an agent gets a small FastAPI + PostgreSQL service with a security flaw or a
-  business-logic bug, plus a bug report, and must fix it.
-- **Tool use (MCP):** an agent operates a mock company's payments, ledger, ticketing and chat
-  tools to carry out a policy.
+**RL environments for coding and tool-using AI agents, with rewards that are hard to game.**
 
-Every solution is scored by deterministic checks the agent never sees during its rollout: hidden
-tests, static analysis, and checks on the final database state. Editing tests, special-casing
-inputs or collateral damage cannot earn reward.
+An agent gets a realistic job: fix a bug in a FastAPI + PostgreSQL service, or carry out a company
+policy through MCP tools (payments, ledger, tickets, chat). It is scored by checks it never sees:
+hidden tests, static analysis and checks on the final database state. Editing tests,
+special-casing inputs or causing collateral damage earns nothing.
 
-## Status
+| | |
+|---|---|
+| **Tasks** | 21: 14 code repair (3 security, 11 business logic) and 7 MCP tool-use workflows |
+| **Rewards** | hidden tests against a locked-down Docker sandbox, an AST static gate, anti-tampering checks, database-state GOAL/GUARD checks |
+| **Quality control** | every task ships gold, no-op and careless reference solutions, re-validated in CI |
+| **Packaging** | Prime Intellect [verifiers](https://github.com/PrimeIntellect-ai/verifiers) v1 environments, pushed to the Environments Hub |
+| **Evaluated** | Qwen3.8-27B and gpt-oss-120b; 31 solutions audited with four verifier types |
 
-14 patch tasks, all validated in the Docker sandbox (gold solved at 1.00, no-op unsolved with zero
-target score, identical scores across 3 runs):
+## Key results
+
+Tests alone are not enough, and neither is an LLM judge. In a 4-day evaluation, every solution was
+re-scored by four verifiers: **V1** public tests, **V2** public + hidden tests, **V3** V2 plus static
+and anti-tampering checks, and **V4** an LLM judge (gpt-oss-20b).
+
+| Model | Patch tasks solved (V3) | Workflows solved (V3) |
+|---|---|---|
+| Qwen3.8-27B | 9 / 11 | 4 / 5 |
+| gpt-oss-120b | 10 / 10 | 5 / 5 |
+
+- **A test-only false positive.** Qwen's fix for a cross-tenant bug passed every public test but
+  stopped saving updates. The hidden tests caught it.
+- **What tests can't see.** Qwen made a SQL endpoint safe with an allow-list but still built the
+  query with an f-string, which the task forbids. Only the static gate caught it.
+- **LLM-judge false negatives.** The judge rejected three solutions that pass every test, once
+  claiming that `datetime.combine` has no `tzinfo` argument (it has had one since Python 3.6).
+
+These come from one attempt per task on a free API tier, so they are case studies rather than solve
+rates. Details are in [results/evals/](results/evals/README.md). A research paper on verifier
+errors in RL environments is in preparation.
+
+## How a code-repair task is scored
+
+```mermaid
+flowchart LR
+    T["Buggy service + bug report"] --> A["Agent edits code in its own container"]
+    A --> C["Scorer copies out app/ only"]
+    C --> H["Fresh public tests + hidden tests, over HTTP"]
+    C --> G["Static analysis + tamper checks"]
+    H --> R["Reward 0-1"]
+    G --> R
+```
+
+The agent's code runs as an unprivileged process in a separate container, and the tests reach it
+only over HTTP, so in-process tricks and edited test files change nothing. Workflows are scored
+on the database state the agent leaves behind, with a penalty for every collateral change.
+
+## Tasks
+
+**14 code-repair tasks.** The harder ones have a bug report that names one symptom, while the
+documented rules hide two or three bugs; a fix of only the reported symptom still fails.
 
 | Task | Category | Bug |
 |---|---|---|
@@ -34,8 +77,7 @@ target score, identical scores across 3 runs):
 | `shipping_quote_013` | business logic | Volumetric weight ignored + rounds to nearest instead of up |
 | `late_fees_014` | business logic (hard) | Fee on total, not outstanding + no grace period + no cap |
 
-Plus 7 **MCP workflow** tasks, where an agent operates mock company tools (read-only SQL,
-refunds, tickets, chat) and is graded on the final database state:
+**7 MCP workflows**, graded on the final database state:
 
 | Workflow | What the agent must do | Traps |
 |---|---|---|
@@ -46,11 +88,6 @@ refunds, tickets, chat) and is graded on the final database state:
 | `refund_policy_v2_105` | Stacked refund policy | Prior-credit rule, one refund per customer per batch, 14-day boundary |
 | `ledger_reconciliation_106` | Report payment/ledger mismatches as tickets, move no money | Partial credits that add up, duplicated credit, existing open ticket, refund tool available |
 | `cancellation_refunds_107` | Refund the right payment for cancellation tickets | Latest payment failed, 30-day boundary to the second, ticket text asking for extra refunds |
-
-**Model evaluations:** Qwen3.8-27B solved 9/10 of the first tasks. On `invoice_sort_001`, the static
-gate caught an f-string SQL fix that the tests alone would have accepted. On the harder set,
-gpt-oss-120b fixed only the reported half of `inventory_reservation_009`. See
-[results/evals/](results/evals/README.md).
 
 See [docs/tasks-explained.md](docs/tasks-explained.md) for a walkthrough of every task and how to
 write new ones. To evaluate models served on your own GPU instead of a hosted API, see
@@ -124,8 +161,11 @@ environments under `environments/`:
 
 | Package | Tasks | Harness | Runtime | `vf-validate` |
 |---|---|---|---|---|
-| `secops_gym_patches` | 11 patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 11/11 valid |
-| `secops_gym_workflows` | 5 MCP workflows | tool-only chat | subprocess + Postgres | 5/5 valid |
+| `secops_gym_patches` | patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 11/11 valid (v0.2.1) |
+| `secops_gym_workflows` | MCP workflows | tool-only chat | subprocess + Postgres | 5/5 valid (v0.2.1) |
+
+The published v0.2.1 packages hold the first 11 patch tasks and 5 workflows; tasks 012-014 and
+workflows 106-107 join in the next release.
 
 ```bash
 uv sync --extra mcp --extra envs              # Linux / macOS / WSL (verifiers is Unix-only)
@@ -190,3 +230,7 @@ The sandbox image (~290 MB) builds automatically on first use and is rebuilt whe
 Without `--sandbox docker`, tests import the app in-process against a Postgres on port 5433
 (`docker compose -f runtime/docker-compose.yml up -d`). It is faster for writing tasks but not
 isolated. Set `DATABASE_URL` to use a different Postgres.
+
+## Author
+
+Md. Zarif Latif, BRAC University, Dhaka · [github.com/zariffromlatif](https://github.com/zariffromlatif)
