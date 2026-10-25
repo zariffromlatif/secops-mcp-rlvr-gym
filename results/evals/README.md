@@ -90,6 +90,34 @@ they predate the environment saving final code (0.2.1).
   produced two spurious judge errors (e.g. payment 17 sat beyond the cut). Judges and annotators
   now see the full results the agent saw. The paper must document how judge inputs are built.
 
+## Round 3: multi-day campaign (2026-10-22 to 2026-10-25)
+
+All 16 tasks of that time (11 patch, 5 workflows) for both models, 1 attempt each, spread over 4 days of
+Groq's free-tier quota (`scripts/eval_campaign.sh`). 31 of 32 attempts finished. gpt-oss-120b's
+`tiered_pricing_010` exceeded Groq's per-request size limit on every try and is excluded.
+Every solution was re-scored with V1 (public tests), V2 (+ hidden tests), V3 (+ static and
+anti-tamper checks; for workflows, goal + guard) and V4 (LLM judge, gpt-oss-20b).
+
+| Model | Patch tasks solved (V3) | Workflows solved (V3) |
+|---|---|---|
+| Qwen3.8-27B | 9 / 11 | 4 / 5 |
+| gpt-oss-120b | 10 / 10 | 5 / 5 |
+
+**Where the verifiers disagree** (`results/audit/verdicts.csv`):
+
+| Task | Model | V1 | V2 | V3 | V4 | What happened |
+|---|---|---|---|---|---|---|
+| `invoice_tenant_002` | Qwen | pass | fail | fail | fail | The fix stopped saving updates. Public tests alone (V1) pass it: a test-only false positive. |
+| `invoice_sort_001` | Qwen | pass | pass | fail | fail | Safe by allow-list, but SQL is still built with an f-string. Tests can't see it. |
+| `daily_report_timezone_006` | gpt-oss | pass | pass | pass | fail | Judge claims `datetime.combine` has no `tzinfo` argument; it has since Python 3.6. Likely judge false negative. |
+| `invoice_tenant_002` | gpt-oss | pass | pass | pass | fail | Judge guesses a rollback "may raise"; the hidden cross-tenant tests pass. Likely judge false negative. |
+| `inventory_reservation_009` | Qwen | pass | pass | pass | fail | Judge objects to aggregating duplicate lines, which the spec requires. Likely judge false negative. |
+
+"Likely" until the blind human labels are in. A methodology note: the judge first returned no
+verdict on 7 of 20 solutions, because gpt-oss-20b spent its whole default reply budget on hidden
+reasoning. The judge now sizes the budget to the provider's request limit and retries once with
+low reasoning effort (see `audit/judge.py`).
+
 ## Reproduce
 
 ```bash

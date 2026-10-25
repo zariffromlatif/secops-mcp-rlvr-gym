@@ -13,6 +13,6 @@ Source run: `secops_gym_patches--openai--gpt-oss-120b--bash--529a294d`
 | orders_pagination_004 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
 | report_auth_003 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
 | revenue_double_count_007 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
-| subscription_proration_008 | 1 | 1 | 0 |  |  |  |  |
+| subscription_proration_008 | 1 | 0 | 1 | 1.0 | 1.0 | 0.8 | 1.5 |
 | tiered_pricing_010 | 1 | 1 | 0 |  |  |  |  |
-| ALL | 11 | 2 | 9 | 1.0 | 1.0 | 0.8 | 1.5 |
+| ALL | 11 | 1 | 10 | 1.0 | 1.0 | 0.8 | 1.5 |
