@@ -33,11 +33,12 @@ RUNTIME = Path(__file__).resolve().parent
 ROOT = RUNTIME.parent
 sys.path.insert(0, str(RUNTIME))
 
-from mcp_tools import BASE_SCHEMA, ToolError, call_tool  # noqa: E402
+from mcp_tools import BASE_SCHEMA, TOOLS, ToolError, call_tool  # noqa: E402
 
 ADMIN_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg://gym:gym@localhost:5433/gym")
 AGENT_ROLE, AGENT_PASSWORD = "wf_agent", "wf_agent"
 GUARD_PENALTY = 0.5
+DEFAULT_MAX_STEPS = 40
 
 
 @dataclass
@@ -59,6 +60,12 @@ class WorkflowScore:
     @property
     def solved(self) -> bool:
         return all(self.goal.values()) and all(self.guard.values())
+
+
+def limits(wf_dir: Path) -> tuple[list[str], int]:
+    """The tools a workflow offers and how many tool calls it allows, from its task.yaml."""
+    spec = yaml.safe_load((wf_dir / "task.yaml").read_text())
+    return spec.get("tools", list(TOOLS)), spec.get("max_steps", DEFAULT_MAX_STEPS)
 
 
 def _admin():
@@ -120,15 +127,17 @@ def episode(wf_dir: Path):
         drop_episode_db(name)
 
 
-def replay(db_name: str, trajectory: list[dict], max_steps: int) -> tuple[list[dict], int]:
-    """Run recorded tool calls as the agent role. Returns per-step results and error count."""
+def replay(db_name: str, trajectory: list[dict], max_steps: int, tools=None) -> tuple[list[dict], int]:
+    """Run recorded tool calls as the agent role, offering only `tools` (None offers all). Calls
+    past `max_steps` are not run. Returns per-step results and error count."""
     engine = create_engine(agent_url(db_name))
     results, errors = [], 0
     try:
         for step in trajectory[:max_steps]:
             try:
                 with engine.begin() as conn:
-                    results.append({"ok": True, "result": call_tool(conn, step["tool"], step.get("args", {}))})
+                    result = call_tool(conn, step["tool"], step.get("args", {}), tools)
+                    results.append({"ok": True, "result": result})
             except ToolError as exc:
                 errors += 1
                 results.append({"ok": False, "error": str(exc)})
@@ -159,11 +168,11 @@ def check_state(wf_dir: Path, db_name: str) -> WorkflowScore:
 
 
 def score_trajectory(wf_dir: Path, trajectory: list[dict]) -> WorkflowScore:
-    spec = yaml.safe_load((wf_dir / "task.yaml").read_text())
+    tools, max_steps = limits(wf_dir)
     with episode(wf_dir) as db_name:
-        _, errors = replay(db_name, trajectory, spec.get("max_steps", 40))
+        _, errors = replay(db_name, trajectory, max_steps, tools)
         score = check_state(wf_dir, db_name)
-    score.tool_errors, score.steps = errors, min(len(trajectory), spec.get("max_steps", 40))
+    score.tool_errors, score.steps = errors, min(len(trajectory), max_steps)
     return score
 
 
@@ -213,7 +222,10 @@ def main() -> int:
         print(json.dumps(report(score_trajectory(args.workflow, trajectory)), indent=2))
     elif args.cmd == "start":
         name = create_episode_db(args.workflow)
+        tools, max_steps = limits(args.workflow)
         print(f"db_name={name}\nWORKFLOW_DB_URL={agent_url(name)}")
+        print(f"tools: {', '.join(tools)} (at most {max_steps} calls)")
+        print(f"\nServe them: WORKFLOW_DB_URL=... uv run python runtime/mcp_server.py {args.workflow}")
         print(f"\nPrompt:\n{yaml.safe_load((args.workflow / 'task.yaml').read_text())['prompt']}")
     elif args.cmd == "finish":
         score = check_state(args.workflow, args.db_name)

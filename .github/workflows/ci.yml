@@ -23,7 +23,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp
       - name: Unit tests (no database)
-        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py
+        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py
       - name: Patch tasks score as expected in the Docker sandbox (3 runs each)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
@@ -51,7 +51,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp --extra envs
-      - name: Tool safety and workflow scoring tests
+      - run: uv run python scripts/sync_envs.py
+      - name: Tool safety, workflow scoring and toolset tests
         run: uv run pytest -q tests
       - name: Build task image
         run: sh scripts/build_task_image.sh

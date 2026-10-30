@@ -171,10 +171,13 @@ CREATE TABLE messages (
 """
 
 
-def call_tool(conn, name: str, args: dict):
-    """Dispatch one tool call. Raises ToolError for unknown tools or bad arguments."""
+def call_tool(conn, name: str, args: dict, allowed=None):
+    """Dispatch one tool call. Raises ToolError for unknown tools, tools outside `allowed` (the
+    task's tool list; None allows all) or bad arguments."""
     if name not in TOOLS:
         raise ToolError(f"unknown tool: {name}")
+    if allowed is not None and name not in allowed:
+        raise ToolError(f"tool {name} is not available in this task")
     aliases = ARG_ALIASES.get(name, {})
     kwargs = {aliases.get(k, k): v for k, v in (args or {}).items()}
     try:

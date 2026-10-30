@@ -2,7 +2,8 @@
 
 The episode database is created on the first tool call and its name is pushed to
 the rollout state, where the task's scorer finds it. Tool calls run as the
-unprivileged `wf_agent` role (read-only SQL, 5 s statement timeout).
+unprivileged `wf_agent` role (read-only SQL, 5 s statement timeout). Each workflow
+offers only the tools its task.yaml lists, and refuses calls past its max_steps.
 """
 
 from __future__ import annotations
@@ -35,14 +36,26 @@ class CompanyToolset(vf.Toolset[vf.ToolsetConfig, WorkflowState]):
     def __init__(self, config: vf.ToolsetConfig) -> None:
         super().__init__(config)
         self.workflow_id: str | None = None
+        self.tools: list[str] = list(mcp_tools.TOOLS)
+        self.max_steps: int | None = None
+        self._steps = 0
         self._db_name: str | None = None
         self._engines: dict = {}
 
     async def setup_task(self, task) -> None:
         data = getattr(task, "data", task)
         self.workflow_id = data.workflow_id
+        self.tools, self.max_steps = episodes.limits(WORKFLOWS / self.workflow_id)
+
+    def register(self, mcp) -> None:
+        super().register(mcp)
+        for name in set(mcp_tools.TOOLS) - set(self.tools):  # advertise only this workflow's tools
+            mcp.remove_tool(name)
 
     def _call(self, name: str, **args):
+        self._steps += 1
+        if self.max_steps is not None and self._steps > self.max_steps:
+            raise ToolError(f"step limit reached: this task allows {self.max_steps} tool calls")
         # The rollout state carries db_name to the scorer; the instance copy keeps one database
         # per rollout even when no state channel is attached (direct use, tests).
         db_name = self.state.db_name or self._db_name
@@ -54,7 +67,7 @@ class CompanyToolset(vf.Toolset[vf.ToolsetConfig, WorkflowState]):
             engine = self._engines[db_name] = create_engine(episodes.agent_url(db_name))
         try:
             with engine.begin() as conn:
-                return mcp_tools.call_tool(conn, name, args)
+                return mcp_tools.call_tool(conn, name, args, self.tools)
         except mcp_tools.ToolError as exc:
             raise ToolError(str(exc)) from None
         except DBAPIError:

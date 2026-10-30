@@ -4,9 +4,11 @@ Start an episode, point the server at its database, connect any MCP client:
 
     uv sync --extra mcp
     uv run python runtime/workflows.py start workflows/duplicate_webhook_refunds_101
-    WORKFLOW_DB_URL=<printed url> uv run python runtime/mcp_server.py      # stdio transport
+    WORKFLOW_DB_URL=<printed url> uv run python runtime/mcp_server.py workflows/duplicate_webhook_refunds_101
     uv run python runtime/workflows.py finish workflows/duplicate_webhook_refunds_101 <db_name>
 
+The server speaks stdio. Given a workflow folder, it offers only the tools that workflow's
+task.yaml lists and refuses calls past its max_steps; without one, it offers every tool.
 Every call runs in its own transaction as the unprivileged `wf_agent` role.
 """
 
@@ -27,9 +29,15 @@ import mcp_tools  # noqa: E402
 
 engine = create_engine(os.environ.get("WORKFLOW_DB_URL", "postgresql+psycopg://wf_agent:wf_agent@localhost:5433/postgres"))
 server = MCPServer("secops-gym-workflows", instructions="Mock payments, ledger, ticketing and chat tools.")
+max_steps: int | None = None
+steps = 0
 
 
 def _run(name: str, **args):
+    global steps
+    steps += 1
+    if max_steps is not None and steps > max_steps:
+        raise ToolError(f"step limit reached: this task allows {max_steps} tool calls")
     try:
         with engine.begin() as conn:
             return mcp_tools.call_tool(conn, name, args)
@@ -78,5 +86,17 @@ def post_message(channel: str, text: str) -> dict:
     return _run("post_message", channel=channel, text=text)
 
 
+def restrict(wf_dir: Path) -> None:
+    """Offer only the tools the workflow's task.yaml lists, and at most its max_steps calls."""
+    global max_steps
+    from workflows import limits
+
+    offered, max_steps = limits(wf_dir)
+    for tool in set(mcp_tools.TOOLS) - set(offered):
+        server.remove_tool(tool)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        restrict(Path(sys.argv[1]))
     server.run("stdio")

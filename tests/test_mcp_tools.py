@@ -91,3 +91,17 @@ def test_channel_must_start_with_hash(db):
 def test_unknown_tool_and_bad_arguments_are_errors(db):
     assert "unknown tool" in call(db, "drop_tables")["error"]
     assert "bad arguments" in call(db, "issue_refund", payment=2)["error"]
+
+
+def test_mcp_server_offers_only_the_workflows_tools():
+    import asyncio
+
+    pytest.importorskip("mcp")
+    import mcp_server
+
+    mcp_server.restrict(Path(__file__).resolve().parents[1] / "workflows" / "q1_vip_escalation_104")
+    names = {t.name for t in asyncio.run(mcp_server.server.list_tools())}
+    assert names == {"sql_query", "close_ticket", "post_message"}
+    mcp_server.steps = mcp_server.max_steps
+    with pytest.raises(Exception, match="step limit"):
+        mcp_server._run("sql_query", query="SELECT 1")
