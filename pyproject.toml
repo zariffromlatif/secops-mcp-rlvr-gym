@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.2"]
+mcp = ["mcp>=2.0"]  # runtime/mcp_server.py uses the 2.x MCPServer API
 envs = ["secops-gym-patches", "secops-gym-workflows"]
 
 [tool.pytest.ini_options]

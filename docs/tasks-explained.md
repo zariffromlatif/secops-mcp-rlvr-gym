@@ -24,7 +24,8 @@ tasks/<task_id>/
 
 ### How a patch is scored
 
-1. Copy `app/`, `tests_public/`, `seed.sql` to a scratch folder and apply the patch.
+1. Copy `app/`, `tests_public/`, `seed.sql` to a scratch folder and apply the patch. A patch that
+   touches anything outside `app/` (tests, seed data) fails the format gate.
 2. Copy `hidden/` in **after** the patch, so the patch can't have seen or changed it.
 3. Start Postgres and the app in their own containers, with no internet access.
 4. Run the tests from a separate container that talks to the app over HTTP.
@@ -32,17 +33,20 @@ tasks/<task_id>/
 
 | Gate | Points | Question it answers |
 |---|---|---|
-| Format | -0.5 or +0.2 | Does the patch apply and parse? Did it leave the tests alone? |
+| Format | -0.5 or +0.2 | Does the patch apply and parse? Did it change only `app/`? |
 | Regression | up to +0.8 | Does everything that used to work still work? |
 | Target / security | up to +1.5 | Is the bug actually fixed? |
 | Static | +0.5 | Is there no SQL built by gluing strings together? |
 
-A fix is **solved** only if every regression and target test passes. The partial points let
-training see "getting closer" before a model fully solves anything.
+A fix is **solved** only if every regression and target test passes and the static gate passes
+(that is why a fix that is safe but still builds SQL from strings scores 0.83 and is not solved).
+The partial points let training see "getting closer" before a model fully solves anything.
 
 ### Why two kinds of hidden tests?
 
-- **Regression tests** catch "fixes" that break other things, such as deleting the endpoint.
+- **Regression tests** catch "fixes" that break other things, such as deleting the endpoint. They
+  also check that read-only endpoints leave the stored data unchanged, so a "fix" that deletes the
+  rows that trigger the bug doesn't count.
 - **Target tests** catch the bug itself. `noop.patch` must fail all of them, which is how we
   know they really test the bug.
 
@@ -59,7 +63,8 @@ page 3 doesn't exist and returns 404.
 **The fix:** round **up**: `math.ceil(total / page_size)`, so 9 / 4 becomes 3.
 
 **How the tests catch it:**
-- Public tests use page sizes that divide evenly (9 / 3), so the bug hides there. That's realistic:
+- Public tests only check `total_pages` for a page size that divides evenly (9 / 3) and never ask for
+  the last page of an uneven split, so the bug hides there. That's realistic:
   bugs often hide in the "easy" cases.
 - Hidden target tests use sizes that don't divide evenly (4, 2, 5, 8) and check that the last page
   is reachable and contains order 9.
@@ -69,7 +74,7 @@ last page) are where bugs live.
 
 ### `invoice_split_rounding_005`: losing cents
 
-**The service:** `POST /invoices/3/split {"payers": 3}` splits an invoice amount between payers.
+**The service:** `POST /invoices/2/split {"payers": 3}` splits an invoice amount between payers.
 
 **The bug:** every payer gets `amount // payers`. 10000 cents / 3 = 3333 each, which adds up to
 9999. One cent disappears, and in real finance systems that breaks reconciliation.
@@ -128,8 +133,9 @@ JOIN produce?" before aggregating.
 ## 2b. The harder business-logic tasks (008–011)
 
 These follow one pattern: **the bug report describes one symptom, but the code has two
-problems**, both covered by rules documented at the top of `app/main.py`. Public tests pass with
-both bugs present. To get full marks, the agent has to read the spec, not just the report.
+problems** (010's report adds a vague hint about the second), both covered by rules documented at
+the top of `app/main.py`. Public tests pass with both bugs present. To get full marks, the agent has
+to read the spec, not just the report.
 
 | Task | Reported symptom | Hidden second problem | What to learn |
 |---|---|---|---|
@@ -159,14 +165,15 @@ call tools, so these tasks test exactly what agent startups care about.
 ```
 workflows/<id>/
 ├── seed.sql      the company's data at the start (customers, payments, tickets)
-├── task.yaml     the instruction given to the agent, and which tools it may use
+├── task.yaml     the instruction given to the agent, the tools it may use and its max_steps
 ├── checks.py     hidden checks on the final database (GOAL and GUARD)
 ├── gold.json     a correct sequence of tool calls (proves it's solvable)
 ├── noop.json     no tool calls (must score 0)
 └── bad_*.json    a careless sequence (must NOT be solved)
 ```
 
-**The tools** (in `runtime/mcp_tools.py`): `sql_query` (read-only), `issue_refund`,
+**The tools** (in `runtime/mcp_tools.py`), of which each workflow offers only those its `task.yaml`
+lists: `sql_query` (read-only), `issue_refund`,
 `create_ticket`, `close_ticket`, `post_message`.
 
 **Scoring = GOAL minus GUARD penalties:**
@@ -233,7 +240,7 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
 
 **Write the correct version first, then break it.** It's much easier than starting from buggy code.
 
-1. **Copy a similar task:** `cp -r tasks/orders_pagination_004 tasks/my_task_008`, then rename
+1. **Copy a similar task:** `cp -r tasks/orders_pagination_004 tasks/my_task_015`, then rename
    the `id` in `task.yaml`.
 2. **Change the story:** a different domain (clinic appointments, bus tickets, library loans) and
    1–2 endpoints. Keep it small.
@@ -245,7 +252,7 @@ For the background, work through the matching free labs in **PortSwigger Web Sec
 5. **Introduce one realistic bug** into `app/main.py`, the kind a rushed developer would write.
 6. **Make the patches:**
    ```bash
-   diff -u --label a/app/main.py --label b/app/main.py tasks/my_task_008/app/main.py gold_main.py > tasks/my_task_008/gold.patch
+   diff -u --label a/app/main.py --label b/app/main.py tasks/my_task_015/app/main.py gold_main.py > tasks/my_task_015/gold.patch
    ```
    `noop.patch` stays empty.
 7. **Write the bug report** in `task.yaml` the way a user would describe the symptom. Describe

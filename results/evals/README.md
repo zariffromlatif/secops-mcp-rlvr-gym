@@ -80,8 +80,9 @@ report that names only one symptom, and public tests that pass with the bug stil
 ## First verifier-audit data (2026-10-21)
 
 The 5 workflow solutions above were re-scored with V1, V3 and an LLM judge (V4, gpt-oss-20b).
-See `results/audit/verdicts.csv`. Patch solutions from these runs can't be re-scored, because
-they predate the environment saving final code (0.2.1).
+Those verdicts are in `results/audit/verdicts.csv` as of commit `92fe896` (Round 3 below replaced
+the file); the judge's answers are still in `results/audit/judge_cache.jsonl`. Patch solutions from
+these runs can't be re-scored, because they predate the environment saving final code (0.2.1).
 
 - **Judge false positive on `refund_policy_v2_105`.** The agent processed 0 requests (a wrong-case
   status filter). The judge accepted "no eligible tickets were found" without checking; V3
@@ -117,6 +118,34 @@ anti-tamper checks; for workflows, goal + guard) and V4 (LLM judge, gpt-oss-20b)
 verdict on 7 of 20 solutions, because gpt-oss-20b spent its whole default reply budget on hidden
 reasoning. The judge now sizes the budget to the provider's request limit and retries once with
 low reasoning effort (see `audit/judge.py`).
+
+## Scorer fixes after the campaign (v0.3.0, 2026-10-30)
+
+A review of the scorers found ways to earn reward without a real fix. Each is fixed and tested:
+
+- **Seed data could be edited.** `runtime/score_patch.py` applied a patch's edits to `seed.sql` and
+  gave the edited seed to the tests, so a patch that only merged the multi-payment rows scored 1.0
+  on `revenue_double_count_007` with the bug unfixed. It also read touched paths relative to the
+  repo instead of the task, so the format gate's syntax check never saw the patched files. Patches
+  may now touch only `app/`. The Prime environment and the audit always used the original seed.
+- **The app could rewrite its own test reports.** In the Prime environment the app ran during the
+  tests while JUnit reports were written to `/tmp`; app code that rewrote them scored full marks
+  with the bug unfixed, and a leftover agent process could take the app's port. The in-box scorer
+  now stops the agent's processes, keeps reports in a root-only directory, and serves the app
+  against a fresh database through a role that can only read and write rows. In the Docker
+  sandbox, the app no longer connects as a Postgres superuser.
+- **The static gate only saw inline SQL.** Moving the f-string into a variable passed it. It now
+  follows variables, `+=` and `.join`, and no longer flags `"..." + "..."` of two literals.
+- **Stored data was never checked.** A revenue endpoint that deleted the extra payment rows passed
+  every test. Hidden regression tests now check that read-only endpoints leave the data unchanged.
+- **`subscription_proration_008` had no exact half cent,** so `round()` (half to even) passed. A
+  new target test covers 500.5 -> 501.
+- **Workflow tool lists and `max_steps` were not enforced:** every workflow exposed all five tools.
+  Each now offers only the tools its `task.yaml` lists.
+
+None of this changes the results above. No solution in `results/audit/solutions.jsonl` uses these
+tricks; re-scoring all 20 patch solutions with the v0.3.0 tests and gates gives the same V1-V3
+verdicts; and no workflow solution called a tool outside its task's list or went past `max_steps`.
 
 ## Reproduce
 

@@ -8,6 +8,9 @@
 # for both models take several days. Each day resumes the same run directories (vf-eval
 # --resume re-runs missing and errored episodes), recorded in .tmp/campaign/state.txt. When every
 # task has a successful episode, or after 4 days, the status line says COMPLETE or STOPPED.
+#
+# Needs GROQ_API_KEY in .env. Runs on Linux and macOS (start Docker first) and on Windows in Git
+# Bash, where it also keeps the PC awake and starts Docker Desktop if needed.
 set -u
 cd "$(dirname "$0")/.."
 CAMPAIGN=.tmp/campaign
@@ -16,7 +19,14 @@ DAYS=$CAMPAIGN/days.txt
 LOG=$CAMPAIGN/log.txt
 mkdir -p "$CAMPAIGN"
 touch "$STATE" "$DAYS"
-export UV_CACHE_DIR='E:\.cache\uv' PYTHONUTF8=1
+export PYTHONUTF8=1
+ON_WINDOWS=
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        ON_WINDOWS=1
+        # The campaign PC keeps uv's cache on E:; set UV_CACHE_DIR to use another place.
+        [ -n "${UV_CACHE_DIR:-}" ] || export UV_CACHE_DIR='E:\.cache\uv' ;;
+esac
 log() { echo "[$(date -u '+%F %T') UTC] $*" | tee -a "$LOG"; }
 status() { uv run python scripts/campaign_status.py "$STATE" --days-run "$(wc -l < "$DAYS")" | tee "$CAMPAIGN/status.txt"; }
 
@@ -25,12 +35,14 @@ if grep -qE "^(COMPLETE|STOPPED)" "$CAMPAIGN/status.txt" 2>/dev/null; then
     log "campaign already finished; nothing to do"; status; exit 0
 fi
 
-# Keep the PC from idle-sleeping while this script runs (a per-process request; no settings change).
-powershell -NoProfile -Command "Add-Type -Name P -Namespace W -MemberDefinition '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f);'; [void][W.P]::SetThreadExecutionState([uint32]2147483649); while (\$true) { Start-Sleep 60 }" &
-AWAKE=$!
-trap 'kill $AWAKE 2>/dev/null' EXIT
+if [ -n "$ON_WINDOWS" ]; then
+    # Keep the PC from idle-sleeping while this script runs (a per-process request; no settings change).
+    powershell -NoProfile -Command "Add-Type -Name P -Namespace W -MemberDefinition '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f);'; [void][W.P]::SetThreadExecutionState([uint32]2147483649); while (\$true) { Start-Sleep 60 }" &
+    AWAKE=$!
+    trap 'kill $AWAKE 2>/dev/null' EXIT
+fi
 
-if ! docker info >/dev/null 2>&1; then
+if [ -n "$ON_WINDOWS" ] && ! docker info >/dev/null 2>&1; then
     log "starting Docker Desktop"
     powershell -NoProfile -Command "Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'"
     for _ in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 5; done

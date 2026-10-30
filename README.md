@@ -13,7 +13,7 @@ special-casing inputs or causing collateral damage earns nothing.
 |---|---|
 | **Tasks** | 21: 14 code repair (3 security, 11 business logic) and 7 MCP tool-use workflows |
 | **Rewards** | hidden tests against a locked-down Docker sandbox, an AST static gate, anti-tampering checks, database-state GOAL/GUARD checks |
-| **Quality control** | every task ships gold, no-op and careless reference solutions, re-validated in CI |
+| **Quality control** | every task ships gold and no-op reference solutions, every workflow a careless one too; all re-validated in CI |
 | **Packaging** | Prime Intellect [verifiers](https://github.com/PrimeIntellect-ai/verifiers) v1 environments, pushed to the Environments Hub |
 | **Evaluated** | Qwen3.8-27B and gpt-oss-120b; 31 solutions audited with four verifier types |
 
@@ -31,7 +31,8 @@ and anti-tampering checks, and **V4** an LLM judge (gpt-oss-20b).
 - **A test-only false positive.** Qwen's fix for a cross-tenant bug passed every public test but
   stopped saving updates. The hidden tests caught it.
 - **What tests can't see.** Qwen made a SQL endpoint safe with an allow-list but still built the
-  query with an f-string, which the task forbids. Only the static gate caught it.
+  query with an f-string, which the task forbids. Every test passed it; the static gate (and the LLM
+  judge) caught it.
 - **LLM-judge false negatives.** The judge rejected three solutions that pass every test, once
   claiming that `datetime.combine` has no `tzinfo` argument (it has had one since Python 3.6).
 
@@ -51,9 +52,10 @@ flowchart LR
     G --> R
 ```
 
-The agent's code runs as an unprivileged process in a separate container, and the tests reach it
-only over HTTP, so in-process tricks and edited test files change nothing. Workflows are scored
-on the database state the agent leaves behind, with a penalty for every collateral change.
+The agent's code runs as an unprivileged process against a fresh database, and the tests reach it
+only over HTTP, using pristine copies of the tests and seed data, so in-process tricks and edited
+tests or data change nothing. Workflows are scored on the database state the agent leaves behind,
+with a penalty for every collateral change.
 
 ## Tasks
 
@@ -111,13 +113,16 @@ docs/         study guide and planning notes
 
 | Gate | Weight | Checks |
 |---|---|---|
-| Format | -0.5 to +0.2 | Patch applies, Python parses, no edits to tests |
-| Regression | +0.8 | Functional test suites pass |
+| Format | -0.5 to +0.2 | Patch applies, Python parses, only `app/` is edited |
+| Regression | +0.8 | Functional test suites pass, and read-only endpoints leave the stored data unchanged |
 | Target / security | +1.5 | Hidden tests that only pass once the bug is fixed |
-| Static analysis | +0.5 | No SQL built from runtime strings (f-strings, `+`, `%`, `.format`) |
+| Static analysis | +0.5 | No SQL built from runtime strings (f-strings, `+`, `%`, `.format`, `.join`), inline or through a variable |
 
-Every task ships a `gold.patch` (must be solved, normalized score 1.0) and a `noop.patch` (must be
-unsolved with a security score of 0). Patches that edit test files score -0.5.
+The reward is the gate total divided by 3.0. A patch is **solved** only if every regression and
+target test passes and the static gate passes. Every task ships a `gold.patch` (must be solved,
+normalized score 1.0) and a `noop.patch` (must be unsolved with a security score of 0; it still earns
+format, regression and static credit, 0.33-0.50). Patches that edit anything outside `app/`, such as
+tests or seed data, score -0.5.
 
 ## Quick start
 
@@ -141,14 +146,15 @@ uv run python runtime/workflows.py score workflows/<id> trajectory.json
 
 A trajectory is a JSON list of tool calls: `[{"tool": "issue_refund", "args": {...}}, ...]`.
 Each episode gets a fresh database; tools run as an unprivileged `wf_agent` role (read-only SQL,
-5 s statement timeout, no superuser functions). Scoring = fraction of GOAL checks passed minus 0.5
+5 s statement timeout, no superuser functions). Each workflow offers only the tools listed in its
+`task.yaml`, and calls past its `max_steps` are not run. Scoring = fraction of GOAL checks passed minus 0.5
 per failed GUARD check (collateral damage such as wrong refunds or leaked PII).
 
 To run a live agent over MCP:
 
 ```bash
 uv run python runtime/workflows.py start workflows/duplicate_webhook_refunds_101   # prints WORKFLOW_DB_URL + prompt
-WORKFLOW_DB_URL=... uv run python runtime/mcp_server.py                            # stdio MCP server
+WORKFLOW_DB_URL=... uv run python runtime/mcp_server.py workflows/duplicate_webhook_refunds_101  # stdio MCP server
 uv run python runtime/workflows.py finish workflows/duplicate_webhook_refunds_101 <db_name>
 ```
 
@@ -161,11 +167,11 @@ environments under `environments/`:
 
 | Package | Tasks | Harness | Runtime | `vf-validate` |
 |---|---|---|---|---|
-| `secops_gym_patches` | patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 11/11 valid (v0.2.1) |
-| `secops_gym_workflows` | MCP workflows | tool-only chat | subprocess + Postgres | 5/5 valid (v0.2.1) |
+| `secops_gym_patches` | patch tasks | bash (agent edits code in a box) | Docker / Prime sandbox | 14/14 valid |
+| `secops_gym_workflows` | MCP workflows | tool-only chat | subprocess + Postgres | 7/7 valid |
 
-The published v0.2.1 packages hold the first 11 patch tasks and 5 workflows; tasks 012-014 and
-workflows 106-107 join in the next release.
+The repo holds v0.3.0: all 14 patch tasks and 7 workflows, the hardened scorer and per-workflow tool
+lists. The Hub still has v0.2.1 (the first 11 patch tasks and 5 workflows) until v0.3.0 is pushed.
 
 ```bash
 uv sync --extra mcp --extra envs              # Linux / macOS / WSL (verifiers is Unix-only)
@@ -178,7 +184,8 @@ uv run vf-validate secops_gym_workflows --runtime.type subprocess
 On Windows, run the same commands inside the Linux devbox: `sh scripts/devbox.sh uv run --no-sync vf-validate ...`.
 
 Publishing: the task image is public at `ghcr.io/zariffromlatif/secops-gym-task:0.1` (rebuild it
-with the **publish-task-image** GitHub Action). Push each environment from its folder with the
+with the **publish-task-image** GitHub Action). The in-box scorer ships with the package and is
+copied into the box at scoring time, so scorer changes don't need a new image. Push each environment from its folder with the
 `prime` CLI (`prime login`, then `prime env push --visibility PRIVATE` from the environment
 folder). On Windows, set `PYTHONUTF8=1` first or the CLI crashes printing status symbols.
 
@@ -216,7 +223,7 @@ the agent saw.
 - an internal Docker network with **no internet access**
 - a fresh Postgres per episode (data on tmpfs)
 - the patched app in its own container: read-only filesystem, non-root, all capabilities dropped,
-  memory / CPU / process limits
+  memory / CPU / process limits, and a database role that can only read and write rows
 - tests in a separate container that reaches the app over HTTP, so the agent's code never runs
   inside the test process and cannot tamper with results
 - hidden tests mounted read-only, only at scoring time

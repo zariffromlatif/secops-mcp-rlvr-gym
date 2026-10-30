@@ -1,6 +1,6 @@
 [project]
 name = "secops-gym-workflows"
-version = "0.2.1"
+version = "0.3.0"
 description = "Operate mock payments, ledger, ticketing and chat tools over MCP; graded on the final database state with damage penalties."
 requires-python = ">=3.11"
 dependencies = ["verifiers>=0.4", "pyyaml>=6.0", "sqlalchemy>=2.0", "psycopg[binary]>=3.2"]

@@ -10,16 +10,19 @@ agent is graded on the **final database state**, not its words.
 | `refund_request_tickets_103` | apply a refund policy to the ticket queue | too-old payment, already refunded, unrelated and closed tickets |
 | `q1_vip_escalation_104` | escalate Q1 VIP customers, close duplicate tickets | quarter boundaries, refunded/failed spend, case-sensitive titles |
 | `refund_policy_v2_105` | stacked refund policy | prior-credit rule, one refund per customer per batch, 14-day boundary |
+| `ledger_reconciliation_106` | report payment/ledger mismatches as tickets, move no money | partial credits that add up, duplicated credit, existing open ticket, refund tool available |
+| `cancellation_refunds_107` | refund the right payment for cancellation tickets | latest payment failed, 30-day boundary to the second, ticket text asking for extra refunds |
 
 **Tools** (per-rollout MCP server): `sql_query` (read-only, 5 s timeout, unprivileged DB role),
-`issue_refund`, `create_ticket`, `close_ticket`, `post_message`. The default harness is the
-tool-only chat loop, with no shell, so every change goes through a validated tool call.
+`issue_refund`, `create_ticket`, `close_ticket`, `post_message`. Each workflow offers only the tools
+its `task.yaml` lists and refuses calls past its `max_steps`. The default harness is the tool-only
+chat loop, with no shell, so every change goes through a validated tool call.
 
 **Reward**: the fraction of hidden GOAL checks passed, minus 0.5 for each failed GUARD check
 (collateral damage), floored at 0. A rollout that never calls a tool scores 0. Each check is
 recorded as a metric (`goal_*`, `guard_*`, `solved`).
 
-**Validation** (`vf-validate`): 5/5 valid. Gold trajectories solve every workflow, and untouched
+**Validation** (`vf-validate`): 7/7 valid. Gold trajectories solve every workflow, and untouched
 episodes score 0. The repo also ships "careless" trajectories that must not be solved.
 
 ## Run
