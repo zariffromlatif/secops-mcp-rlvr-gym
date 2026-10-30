@@ -130,10 +130,10 @@ A review of the scorers found ways to earn reward without a real fix. Each is fi
   may now touch only `app/`. The Prime environment and the audit always used the original seed.
 - **The app could rewrite its own test reports.** In the Prime environment the app ran during the
   tests while JUnit reports were written to `/tmp`; app code that rewrote them scored full marks
-  with the bug unfixed, and a leftover agent process could take the app's port. The in-box scorer
-  now stops the agent's processes, keeps reports in a root-only directory, and serves the app
-  against a fresh database through a role that can only read and write rows. In the Docker
-  sandbox, the app no longer connects as a Postgres superuser.
+  with the bug unfixed, and a process the agent left running could take the app's port. The
+  in-box scorer now keeps reports in a root-only directory, binds the app's port itself (one the
+  OS picks), and serves the app against a fresh database through a role that can only read and
+  write rows. In the Docker sandbox, the app no longer connects as a Postgres superuser.
 - **The static gate only saw inline SQL.** Moving the f-string into a variable passed it. It now
   follows variables, `+=` and `.join`, and no longer flags `"..." + "..."` of two literals.
 - **Stored data was never checked.** A revenue endpoint that deleted the extra payment rows passed

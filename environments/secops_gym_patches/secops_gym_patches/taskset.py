@@ -2,9 +2,9 @@
 
 Each rollout gets a container with the service in /app and a local Postgres. The
 agent (bash harness by default) edits /app/app as the unprivileged `agent` user.
-Scoring stops the agent's processes, copies its app/, serves it as `nobody` against
-a fresh database, and runs pristine public tests plus hidden tests against it over
-HTTP (see image/score_box.py).
+Scoring copies the agent's app/, serves it as `nobody` on a port the scorer binds,
+against a fresh database, and runs pristine public tests plus hidden tests against
+it over HTTP (see image/score_box.py).
 """
 
 from __future__ import annotations

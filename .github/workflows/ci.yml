@@ -34,6 +34,7 @@ jobs:
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       db:
         image: postgres:16-alpine
@@ -58,9 +59,15 @@ jobs:
         run: sh scripts/build_task_image.sh
       - name: vf-validate secops_gym_patches (gold + noop, Docker runtime)
         run: |
-          uv run vf-validate secops_gym_patches --runtime.type docker -o vf-out/patches
+          uv run vf-validate secops_gym_patches --runtime.type docker --timeout.setup 300 --timeout.total 600 -o vf-out/patches
           python -c "import json,glob,sys; s=json.load(open(glob.glob('vf-out/patches/*/summary.json')[0])); print(s['outcomes']); sys.exit(s['valid_rate'] != 1.0)"
       - name: vf-validate secops_gym_workflows (gold + noop)
         run: |
-          uv run vf-validate secops_gym_workflows --runtime.type subprocess -o vf-out/workflows
+          uv run vf-validate secops_gym_workflows --runtime.type subprocess --timeout.total 300 -o vf-out/workflows
           python -c "import json,glob,sys; s=json.load(open(glob.glob('vf-out/workflows/*/summary.json')[0])); print(s['outcomes']); sys.exit(s['valid_rate'] != 1.0)"
+      - name: vf-validate logs (on failure)
+        if: failure()
+        run: |
+          for f in vf-out/*/*/logs/*.log vf-out/*/*/results.jsonl; do
+            [ -f "$f" ] && { echo "== $f"; tail -n 60 "$f" | cut -c1-2000; }
+          done

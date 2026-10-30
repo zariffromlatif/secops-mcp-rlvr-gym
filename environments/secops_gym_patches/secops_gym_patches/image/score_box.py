@@ -6,11 +6,11 @@ spec.json: {"regression": [targets], "security": [targets],
             "originals": {"tests_public/...": text, "seed.sql": text}}
 Hidden tests must already be at /opt/gym/task/hidden/.
 
-The agent's processes are killed first. Its app/ is copied to a scratch dir and
-served by uvicorn as `nobody`, against a fresh database the agent never touched,
-through a role that may only read and write rows. pytest runs as root against it
-over HTTP using pristine copies of the tests and seed data, and writes its
-reports to a root-only directory, so neither edited tests, leftover processes,
+The agent's app/ is copied to a scratch dir and served by uvicorn as `nobody`, on
+a port the OS picks, against a fresh database the agent never touched, through a
+role that may only read and write rows. pytest runs as root against it over HTTP
+using pristine copies of the tests and seed data, and writes its reports to a
+root-only directory, so neither edited tests, processes the agent left running,
 database changes nor in-process tricks in the app can change the results.
 Prints one JSON line.
 """
@@ -19,6 +19,7 @@ import json
 import os
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -44,11 +45,11 @@ def junit(report: Path) -> tuple[int, int]:
     return total - failed, max(total, 1)
 
 
-def wait_for_app(deadline_s: float = 20) -> None:
+def wait_for_app(url: str, deadline_s: float = 20) -> None:
     end = time.monotonic() + deadline_s
     while time.monotonic() < end:
         try:
-            urllib.request.urlopen("http://127.0.0.1:8000/", timeout=1)
+            urllib.request.urlopen(url, timeout=1)
             return
         except urllib.error.HTTPError:
             return  # any HTTP response means the server is up
@@ -59,7 +60,7 @@ def wait_for_app(deadline_s: float = 20) -> None:
 def psql(database: str, sql: str) -> None:
     subprocess.run(
         ["su", "postgres", "-s", "/bin/sh", "-c", f"psql -p 5433 -d {database} -q -v ON_ERROR_STOP=1"],
-        input=sql, text=True, check=True, stdout=subprocess.DEVNULL,
+        input=sql, text=True, check=True, stdout=subprocess.DEVNULL, timeout=120,
     )
 
 
@@ -88,10 +89,6 @@ def fresh_database() -> tuple[str, str]:
 def main(spec_path: str) -> None:
     spec = json.loads(Path(spec_path).read_text())
     originals = spec["originals"]
-
-    # The agent is done: nothing it left running may serve on the app's port or touch scoring files.
-    for user in ("agent", "nobody"):
-        subprocess.run(["pkill", "-KILL", "-u", user], check=False)
 
     agent_tests = {
         p.relative_to(APP).as_posix(): p.read_text(errors="replace")
@@ -132,34 +129,37 @@ def main(spec_path: str) -> None:
     os.chmod(WORK / "seed.sql", 0o600)
 
     subprocess.run(["sh", "/opt/gym/start_db.sh"], check=True)
-    owner_url, app_url = fresh_database()
+    owner_db, app_db = fresh_database()
     shutil.rmtree(REPORTS, ignore_errors=True)
     REPORTS.mkdir(mode=0o700, parents=True)
     env = {k: v for k, v in os.environ.items() if k not in {"APP_URL", "DATABASE_URL"}}
     env.update(PYTHONDONTWRITEBYTECODE="1")
-    server = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
-        cwd=WORK, env={**env, "DATABASE_URL": app_url}, user="nobody", group="nobody",
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    # Bind the app's port here, on one the OS picks, and hand the socket to uvicorn: nothing the
+    # agent left running can hold that port or answer on it.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        app_url = f"http://127.0.0.1:{sock.getsockname()[1]}"
+        server = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "app.main:app", "--fd", str(sock.fileno())],
+            cwd=WORK, env={**env, "DATABASE_URL": app_db}, user="nobody", group="nobody",
+            pass_fds=(sock.fileno(),), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
     results = {}
     try:
-        wait_for_app()
-        serving = server.poll() is None  # our uvicorn, not whatever else answered on the port
+        wait_for_app(app_url)
         for group in ("regression", "security"):
             passed = total = 0
             for i, target in enumerate(spec[group]):
                 report = REPORTS / f"{group}-{i}.xml"
-                if serving:
-                    try:
-                        subprocess.run(
-                            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
-                             "--timeout=60", f"--junitxml={report}", target],
-                            cwd=WORK, env={**env, "DATABASE_URL": owner_url, "APP_URL": "http://127.0.0.1:8000"},
-                            capture_output=True, timeout=300,
-                        )
-                    except subprocess.TimeoutExpired:
-                        pass
+                try:
+                    subprocess.run(
+                        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                         "--timeout=60", f"--junitxml={report}", target],
+                        cwd=WORK, env={**env, "DATABASE_URL": owner_db, "APP_URL": app_url},
+                        capture_output=True, timeout=300,
+                    )
+                except subprocess.TimeoutExpired:
+                    pass
                 p, t = junit(report)
                 passed, total = passed + p, total + t
             results[group] = [passed, total]
