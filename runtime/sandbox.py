@@ -3,7 +3,8 @@
 Each episode gets its own internal network (no internet) with three containers:
 
     db    postgres, data on tmpfs, fresh every episode
-    app   the agent's (patched) code served by uvicorn, read-only mount
+    app   the agent's (patched) code served by uvicorn, read-only mount; its database role
+          may only read and write rows (no DDL, no superuser)
     test  public + hidden tests, talking to `app` over HTTP
 
 The agent's code never runs inside the test process, so it cannot tamper with
@@ -22,7 +23,13 @@ from pathlib import Path
 
 RUNTIME = Path(__file__).resolve().parent
 DB_IMAGE = "postgres:16-alpine"
-DB_URL = "postgresql+psycopg://gym:gym@db:5432/gym"
+DB_URL = "postgresql+psycopg://gym:gym@db:5432/gym"  # tests: the owner, who seeds the tables
+APP_DB_URL = "postgresql+psycopg://app:app@db:5432/gym"  # the agent's app: rows only, no superuser
+APP_ROLE_SQL = """
+CREATE ROLE app LOGIN PASSWORD 'app';
+ALTER DEFAULT PRIVILEGES FOR ROLE gym IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app;
+ALTER DEFAULT PRIVILEGES FOR ROLE gym IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app;
+"""
 
 LOCKDOWN = [
     "--read-only",
@@ -95,12 +102,13 @@ def run_episode(workdir: Path, targets: list[str], test_timeout: float = 300) ->
             DB_IMAGE,
         )
         _wait_for_db(db)
+        _docker("exec", db, "psql", "-U", "gym", "-d", "gym", "-q", "-v", "ON_ERROR_STOP=1", "-c", APP_ROLE_SQL)
 
         _docker(
             "run", "-d", "--name", app, "--network", net, "--network-alias", "app",
             *LOCKDOWN,
             *_bind(workdir / "app", "/work/app"),
-            "-e", f"DATABASE_URL={DB_URL}",
+            "-e", f"DATABASE_URL={APP_DB_URL}",
             image, "python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
         )
 

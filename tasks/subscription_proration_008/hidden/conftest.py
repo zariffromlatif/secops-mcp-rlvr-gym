@@ -54,3 +54,10 @@ def change(client, sub, plan, day):
 def amounts(response):
     body = response.json()
     return body["credit_cents"], body["charge_cents"], body["net_cents"]
+
+
+def stored_data():
+    """Every row of every table, to check that an endpoint left the stored data alone."""
+    with engine.connect() as conn:
+        tables = conn.exec_driver_sql("SELECT tablename FROM pg_tables WHERE schemaname = 'public'").scalars().all()
+        return {t: sorted(map(tuple, conn.exec_driver_sql(f'SELECT * FROM "{t}"')), key=repr) for t in sorted(tables)}

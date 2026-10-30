@@ -1,8 +1,9 @@
 """Score a patch against a task.
 
 The patch is applied to a scratch copy holding only what the agent may see.
-Hidden tests are copied in only after the patch is applied, then every test
-group runs in its own pytest process.
+It may only touch the task's `editable_paths` (app/): a patch that edits tests
+or seed data fails the format gate. Hidden tests are copied in only after the
+patch is applied, then every test group runs in its own pytest process.
 
     uv run python runtime/score_patch.py tasks/invoice_sort_001 tasks/invoice_sort_001/gold.patch
     uv run python runtime/score_patch.py --sandbox docker tasks/invoice_sort_001 my.patch
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -46,13 +48,16 @@ def prepare_workdir(task_dir: Path, workdir: Path) -> None:
 def apply_patch(workdir: Path, patch: Path) -> tuple[bool, list[str]]:
     if not patch.read_text().strip():
         return True, []
+    # Scratch dirs live inside this repo's worktree; without a ceiling, git would find the repo and
+    # report paths relative to its root (.tmp/gym-*/app/main.py) instead of the workdir.
+    env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(workdir.parent)}
     numstat = subprocess.run(
-        ["git", "apply", "--numstat", str(patch)], cwd=workdir, capture_output=True, text=True
+        ["git", "apply", "--numstat", str(patch)], cwd=workdir, capture_output=True, text=True, env=env
     )
     if numstat.returncode:
         return False, []
     touched = [line.split("\t")[2] for line in numstat.stdout.splitlines() if line]
-    applied = subprocess.run(["git", "apply", str(patch)], cwd=workdir, capture_output=True)
+    applied = subprocess.run(["git", "apply", str(patch)], cwd=workdir, capture_output=True, env=env)
     return applied.returncode == 0, touched
 
 
@@ -85,9 +90,11 @@ def read_py(workdir: Path, paths) -> dict[str, str]:
 
 def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBreakdown:
     task_dir, patch = task_dir.resolve(), patch.resolve()
-    spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
+    task = yaml.safe_load((task_dir / "task.yaml").read_text())
+    spec = task["scoring"]
     # Bug-fix tasks name their task-specific hidden checks `target`; security tasks use `security`.
     spec["security"] = spec.get("security") or spec["target"]
+    editable = tuple(task.get("editable_paths") or ["app/"])
     TMP_ROOT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="gym-", dir=TMP_ROOT) as tmp:
         workdir = Path(tmp)
@@ -99,6 +106,9 @@ def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBr
             r.format = -0.5
             r.notes.append("patch does not apply")
             return r
+        if any(not path.startswith(editable) for path in touched):
+            # Edited tests or seed data would change what the tests measure: fail before running them.
+            return score(read_py(workdir, touched), touched, {}, (0, 0), (0, 0), editable)
 
         shutil.copytree(task_dir / "hidden", workdir / "hidden")
         app_paths = [p.relative_to(workdir) for p in (workdir / "app").rglob("*.py")]
@@ -116,6 +126,7 @@ def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBr
             app_files=read_py(workdir, app_paths),
             regression=regression,
             security=security,
+            editable=editable,
         )
 
 

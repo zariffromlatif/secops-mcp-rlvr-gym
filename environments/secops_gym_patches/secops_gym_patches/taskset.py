@@ -2,8 +2,9 @@
 
 Each rollout gets a container with the service in /app and a local Postgres. The
 agent (bash harness by default) edits /app/app as the unprivileged `agent` user.
-Scoring copies the agent's app/, serves it as `nobody`, and runs pristine public
-tests plus hidden tests against it over HTTP (see image/score_box.py).
+Scoring stops the agent's processes, copies its app/, serves it as `nobody` against
+a fresh database, and runs pristine public tests plus hidden tests against it over
+HTTP (see image/score_box.py).
 """
 
 from __future__ import annotations
@@ -94,6 +95,8 @@ class PatchTask(vf.Task[PatchData, PatchState]):
             "originals": originals,
         }
         await runtime.write(f"{BOX}/task/spec.json", json.dumps(spec).encode())
+        # The scorer ships with this package, so scorer fixes reach published images without a rebuild.
+        await runtime.write(f"{BOX}/score_box.py", (PKG / "image" / "score_box.py").read_bytes())
         result = await _run(runtime, ["python", f"{BOX}/score_box.py", f"{BOX}/task/spec.json"])
         out = json.loads(result.stdout.strip().splitlines()[-1])
         breakdown = gates.score(
