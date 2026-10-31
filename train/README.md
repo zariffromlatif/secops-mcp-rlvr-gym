@@ -57,6 +57,11 @@ to fix bugs.
 
 ## Running
 
+On limited GPU time, use the campaign: one command per session runs everything below in order,
+alternates the V3 and V2 runs so they always have the same number of steps, and stops before a
+deadline (`python -m train.campaign --deadline 12:40`; see the lab guide in
+[docs/bracu-pc.md](../docs/bracu-pc.md)). The steps one by one:
+
 ```bash
 uv pip install -r train/requirements.txt     # CUDA GPU; these packages are not in the main lockfile
 

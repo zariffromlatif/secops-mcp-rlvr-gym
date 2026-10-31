@@ -13,12 +13,12 @@ app/main.py; the tests, the seed data and app/db.py stay as they are."""
 
 
 def prompt(task_dir: Path) -> list[dict]:
-    task = yaml.safe_load((task_dir / "task.yaml").read_text())
+    task = yaml.safe_load((task_dir / "task.yaml").read_text(encoding="utf-8"))
     files = []
     for path in sorted([*(task_dir / "app").rglob("*.py"), *(task_dir / "tests_public").rglob("*.py")]):
         rel = path.relative_to(task_dir).as_posix()
         if path.stat().st_size and "__pycache__" not in rel:
-            files.append(f"<file path=\"{rel}\">\n{path.read_text()}</file>")
+            files.append(f"<file path=\"{rel}\">\n{path.read_text(encoding='utf-8')}</file>")
     return [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": f"{task['prompt'].strip()}\n\n" + "\n\n".join(files) + f"\n\n{FORMAT}"},

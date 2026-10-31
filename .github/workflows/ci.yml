@@ -91,17 +91,14 @@ jobs:
         run: |
           uv pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6"
           uv pip install -r train/requirements.txt
-      - name: Two GRPO steps and an evaluation of the saved adapter
+      - name: The whole campaign (scorer check, tasks, baseline, alternating training, evaluations, report)
         run: |
-          MODEL=trl-internal-testing/tiny-Qwen2ForCausalLM-2.5
-          uv run --no-sync python -m train.grpo --model $MODEL --sandbox local --steps 2 --batch 4 \
-            --grad-accum 1 --num-generations 4 --max-completion-length 64 --workers 2 --save-steps 1 --out .tmp/smoke
-          uv run --no-sync python -m train.grpo --model $MODEL --sandbox local --steps 3 --batch 4 \
-            --grad-accum 1 --num-generations 4 --max-completion-length 64 --workers 2 --save-steps 1 --out .tmp/smoke --resume
-          test "$(wc -l < .tmp/smoke/samples.jsonl)" -eq 12
-          uv run --no-sync python -m train.evaluate --model $MODEL --adapter .tmp/smoke/final --sandbox local \
-            --only revenue_double_count_007 -k 2 --max-new-tokens 32 --workers 2 --out .tmp/smoke-eval
-          uv run --no-sync python -m train.report .tmp/smoke
+          uv run --no-sync python -m train.campaign --deadline "$(date -d '+3 hours' +%H:%M)" \
+            --model trl-internal-testing/tiny-Qwen2ForCausalLM-2.5 --allow-cpu --sandbox local \
+            --steps 2 --chunk 1 -k 1 --heldout-count 1 --extra-count 1 --batch 4 --grad-accum 1 \
+            --num-generations 4 --max-completion-length 48 --workers 2 --secret-file .tmp/secret --out .tmp/campaign
+          grep -q "campaign complete" .tmp/campaign/campaign.log
+          test "$(wc -l < .tmp/campaign/v3/samples.jsonl)" -eq 8 && test -f .tmp/campaign/eval-v2-heldout/summary.json
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.

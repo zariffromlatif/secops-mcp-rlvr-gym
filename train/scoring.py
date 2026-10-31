@@ -78,7 +78,7 @@ class Scorer:
             ast.parse(main_py)
         except SyntaxError as exc:
             return {"v1": 0.0, "v2": 0.0, "v3": 0.0, "solved": False, "notes": [f"syntax error: {exc.msg}"]}
-        spec = yaml.safe_load((task_dir / "task.yaml").read_text())
+        spec = yaml.safe_load((task_dir / "task.yaml").read_text(encoding="utf-8"))
         scoring = spec["scoring"]
         hidden_regression = [t for t in scoring["regression"] if t != "tests_public"]
         target = scoring.get("security") or scoring["target"]
@@ -86,7 +86,7 @@ class Scorer:
         with tempfile.TemporaryDirectory(prefix="train-", dir=sp.TMP_ROOT) as tmp:
             work = Path(tmp)
             sp.prepare_workdir(task_dir, work)
-            (work / "app" / "main.py").write_text(main_py)
+            (work / "app" / "main.py").write_text(main_py, encoding="utf-8")  # answers aren't ASCII-only
             shutil.copytree(task_dir / "hidden", work / "hidden")
             targets = ["tests_public", *hidden_regression, *target]
             if self.sandbox in ("docker", "warm"):

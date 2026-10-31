@@ -16,6 +16,7 @@ Needs a GPU and the packages in train/requirements.txt. Scoring needs Docker (de
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
 import sys
@@ -72,6 +73,16 @@ class Reward:
         return [r[self.choice] for r in results]
 
 
+def parse_deadline(text: str | None) -> float | None:
+    """'12:40' (local time, the next time the clock shows it) as a Unix timestamp."""
+    if not text:
+        return None
+    hour, minute = map(int, text.split(":"))
+    now = dt.datetime.now()
+    at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return (at if at > now else at + dt.timedelta(days=1)).timestamp()
+
+
 def gold_main(task_dir: Path) -> str:
     sp.TMP_ROOT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="gold-", dir=sp.TMP_ROOT) as tmp:
@@ -109,8 +120,26 @@ def train(args, data: list[dict], reward: Reward) -> None:
     import torch
     from datasets import Dataset
     from peft import LoraConfig
-    from transformers import BitsAndBytesConfig
+    from transformers import BitsAndBytesConfig, TrainerCallback
     from trl import GRPOConfig, GRPOTrainer
+
+    class Checkpoints(TrainerCallback):
+        """A checkpoint at the last step, so a run can grow in chunks; and save-and-stop when the next
+        step would end after the deadline. --resume continues from either."""
+
+        def __init__(self, deadline: float | None):
+            self.deadline, self.started, self.longest = deadline, None, 0.0
+
+        def on_step_begin(self, args, state, control, **kwargs):
+            self.started = time.time()
+
+        def on_step_end(self, args, state, control, **kwargs):
+            self.longest = max(self.longest, time.time() - self.started)
+            if state.global_step >= state.max_steps:
+                control.should_save = True
+            elif self.deadline and time.time() + 1.5 * self.longest > self.deadline:
+                control.should_save = True
+                control.should_training_stop = True
 
     cuda = torch.cuda.is_available()
     if args.load_in_4bit and not cuda:
@@ -119,6 +148,7 @@ def train(args, data: list[dict], reward: Reward) -> None:
         output_dir=str(args.out),
         max_steps=args.steps,
         learning_rate=args.lr,
+        lr_scheduler_type="constant",  # the same at any step, so a run can grow in chunks across sessions
         per_device_train_batch_size=args.batch,
         gradient_accumulation_steps=args.grad_accum,
         num_generations=args.num_generations,
@@ -131,7 +161,7 @@ def train(args, data: list[dict], reward: Reward) -> None:
         logging_steps=1,
         save_steps=args.save_steps,
         save_total_limit=2,
-        log_completions=True,
+        log_completions=False,  # every answer is in samples.jsonl already
         use_vllm=args.vllm,
         vllm_mode="colocate",
         seed=args.seed,
@@ -151,6 +181,7 @@ def train(args, data: list[dict], reward: Reward) -> None:
         peft_config=LoraConfig(r=args.lora_r, lora_alpha=2 * args.lora_r, target_modules="all-linear",
                                task_type="CAUSAL_LM"),
         quantization_config=quant,
+        callbacks=[Checkpoints(parse_deadline(args.deadline))],
     )
     # Lab sessions end at a fixed time: --resume continues from the last checkpoint in --out.
     trainer.train(resume_from_checkpoint=args.resume and any(args.out.glob("checkpoint-*")))
@@ -183,6 +214,7 @@ def main() -> None:
     parser.add_argument("--vllm", action="store_true", help="generate with vLLM in the training process")
     parser.add_argument("--save-steps", type=int, default=25)
     parser.add_argument("--resume", action="store_true", help="continue from the last checkpoint in --out")
+    parser.add_argument("--deadline", help="HH:MM local time: save and stop before then")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--report-to", default="none")
     parser.add_argument("--dry-run", action="store_true", help="score gold and buggy code, no model")

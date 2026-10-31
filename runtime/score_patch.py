@@ -82,7 +82,7 @@ def run_group(workdir: Path, targets: list[str]) -> tuple[int, int]:
 
 def read_py(workdir: Path, paths) -> dict[str, str]:
     return {
-        str(p).replace("\\", "/"): (workdir / p).read_text()
+        str(p).replace("\\", "/"): (workdir / p).read_text(encoding="utf-8", errors="replace")
         for p in paths
         if str(p).endswith(".py") and (workdir / p).exists()
     }

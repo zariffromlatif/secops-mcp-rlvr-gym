@@ -88,6 +88,16 @@ def test_report_counts_gamed_samples():
     assert "| t | 1 | 0.500 | 0.0% | 100.0% | 100.0% |" in report.render({"run": samples}, 10, last=5)
 
 
+def test_deadline_is_the_next_time_the_clock_shows_it():
+    import time
+
+    from train.grpo import parse_deadline
+
+    at = parse_deadline("12:40")
+    assert time.time() < at <= time.time() + 24 * 3600 and time.localtime(at)[3:5] == (12, 40)
+    assert parse_deadline(None) is None
+
+
 def test_evaluation_summary_marks_tasks_without_learning_signal():
     rows = [{"task": "a", "v1": 1.0, "v2": 0.5, "v3": v3, "solved": v3 == 1.0} for v3 in (0.5, 1.0)]
     rows += [{"task": "b", "v1": 1.0, "v2": 0.5, "v3": 0.5, "solved": False} for _ in range(2)]
