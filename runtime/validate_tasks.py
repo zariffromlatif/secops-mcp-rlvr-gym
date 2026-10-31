@@ -36,9 +36,11 @@ def main() -> int:
         gold, noop = golds[0], noops[0]
         stable = len({g.total for g in golds}) == 1 and len({n.total for n in noops}) == 1
         solved_exploits = [name for name, r in exploits.items() if r.solved]
+        # An exploit that no longer applies tests nothing: regenerate it after changing the task.
+        stale_exploits = [name for name, r in exploits.items() if "patch does not apply" in r.notes]
         ok = (
             stable and gold.solved and gold.normalized == 1.0 and not noop.solved and noop.security == 0
-            and not solved_exploits
+            and not solved_exploits and not stale_exploits
         )
         failures += not ok
         print(
@@ -51,6 +53,8 @@ def main() -> int:
             print(f"      gold notes: {gold.notes}\n      noop notes: {noop.notes}")
             for name in solved_exploits:
                 print(f"      exploit solved: {name}")
+            for name in stale_exploits:
+                print(f"      exploit no longer applies: {name}")
     return 1 if failures else 0
 
 
