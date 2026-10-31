@@ -104,7 +104,14 @@ def main(spec_path: str) -> None:
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if (APP / "app").is_dir():
-        shutil.copytree(APP / "app", WORK / "app", ignore=shutil.ignore_patterns("__pycache__"))
+        # Links are copied as links and then dropped. Followed by this root process, a link to a
+        # root-only file (the hidden tests) would hand its contents to the app, and the chmod
+        # below would change the permissions of whatever it points to.
+        shutil.copytree(APP / "app", WORK / "app", symlinks=True, ignore=shutil.ignore_patterns("__pycache__"))
+        for root, dirs, files in os.walk(WORK / "app"):
+            for name in dirs + files:
+                if os.path.islink(os.path.join(root, name)):
+                    os.unlink(os.path.join(root, name))
     else:
         (WORK / "app").mkdir()
     for rel, text in originals.items():

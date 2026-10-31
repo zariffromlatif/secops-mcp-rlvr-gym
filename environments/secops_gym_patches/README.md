@@ -14,8 +14,8 @@ fees).
   copied out and served by uvicorn as `nobody`, on a port the scorer binds itself, against a fresh
   database through a role that can only read and write rows, and **pristine** public tests plus the
   hidden tests run against it over HTTP, writing their reports to a root-only directory. Editing
-  tests or data, processes the agent left running, or in-process tricks in the app code can't
-  change the result.
+  tests or data, processes the agent left running, symlinks planted in `app/` (they are dropped
+  when the code is copied out), or in-process tricks in the app code can't change the result.
 - The scorer (`image/score_box.py`) ships with this package and is copied into the box at scoring
   time, so scorer fixes reach the published image without a rebuild.
 - `/app/app` is declared as an artifact, so `--env.id isolated_verifier` can re-score in a fresh box.
