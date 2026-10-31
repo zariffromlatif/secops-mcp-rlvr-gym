@@ -12,3 +12,5 @@ environments/*/*/data/
 environments/*/*/_vendor/
 environments/*/*/image/requirements.txt
 environments/*/.prime/
+tasks_generated/
+tasks_private/

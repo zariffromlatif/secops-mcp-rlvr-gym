@@ -33,6 +33,7 @@ def test_fix_lines_are_the_added_lines_of_the_patched_file(tmp_path):
 
 def test_unreviewed_survivors_are_reported(tmp_path, monkeypatch):
     monkeypatch.setattr(mutants, "OUT", tmp_path)
+    monkeypatch.setattr(mutants, "REVIEWED", [tmp_path / "equivalent.yaml"])
     (tmp_path / "equivalent.yaml").write_text("t L1 < -> <=: harmless\n")
     survivors = [{"line": 1, "kind": "comparison", "before": "<", "after": "<=", "in_fix": True},
                  {"line": 2, "kind": "constant", "before": "5", "after": "6", "in_fix": True}]

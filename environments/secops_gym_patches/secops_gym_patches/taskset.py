@@ -54,6 +54,7 @@ async def _run(runtime: vf.Runtime, argv: list[str]) -> vf.ProgramResult:
 class PatchData(vf.TaskData):
     task_id: str
     category: str = ""
+    source_dir: str = ""  # set for tasks loaded from extra_task_dirs
 
 
 class PatchState(vf.State):
@@ -69,7 +70,7 @@ class PatchTask(vf.Task[PatchData, PatchState]):
 
     @property
     def task_dir(self) -> Path:
-        return TASKS / self.data.task_id
+        return Path(self.data.source_dir) if self.data.source_dir else TASKS / self.data.task_id
 
     async def setup(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         for rel, content in _files(self.task_dir, "app", "tests_public", "seed.sql").items():
@@ -145,12 +146,17 @@ class PatchTasksetConfig(vf.TasksetConfig):
     """Task image; build it with scripts/build_task_image.sh or pull a published tag."""
     categories: list[str] = []
     """Only load tasks in these categories (e.g. ["security"]); empty loads all."""
+    extra_task_dirs: list[str] = []
+    """More task folders to load, e.g. factory output (factory/generate.py) or a private held-out split."""
     task: vf.TaskConfig = vf.TaskConfig()
 
 
 class PatchTaskset(vf.Taskset[PatchTask, PatchTasksetConfig]):
     def load(self):
-        for spec_path in sorted(TASKS.glob("*/task.yaml")):
+        specs = sorted(TASKS.glob("*/task.yaml"))
+        for folder in self.config.extra_task_dirs:
+            specs += sorted(Path(folder).expanduser().resolve().glob("*/task.yaml"))
+        for spec_path in specs:
             spec = yaml.safe_load(spec_path.read_text())
             category = "security" if "security" in spec["scoring"] else spec.get("category", "")
             if self.config.categories and category not in self.config.categories:
@@ -158,6 +164,7 @@ class PatchTaskset(vf.Taskset[PatchTask, PatchTasksetConfig]):
             yield PatchTask(
                 PatchData(
                     task_id=spec["id"],
+                    source_dir="" if spec_path.parent.parent == TASKS else str(spec_path.parent),
                     name=spec["id"],
                     category=category,
                     prompt=spec["prompt"].strip() + INSTRUCTIONS,

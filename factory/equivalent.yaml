@@ -1,0 +1,2 @@
+# Surviving mutants that are harmless in every task of a family. Key: "family:<name> L<line> <before> -> <after>".
+family:pagination L18 1 -> 0: max(0, ...) differs only for an empty table; every generated seed has rows

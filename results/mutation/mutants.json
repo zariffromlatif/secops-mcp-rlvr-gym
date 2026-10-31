@@ -1,6 +1,7 @@
 [
   {
     "task": "attachment_path_traversal_015",
+    "family": null,
     "mutants": 8,
     "killed": 8,
     "fix_mutants": 4,
@@ -9,6 +10,7 @@
   },
   {
     "task": "daily_report_timezone_006",
+    "family": null,
     "mutants": 10,
     "killed": 10,
     "fix_mutants": 5,
@@ -17,6 +19,7 @@
   },
   {
     "task": "idempotency_keys_011",
+    "family": null,
     "mutants": 12,
     "killed": 10,
     "fix_mutants": 4,
@@ -40,6 +43,7 @@
   },
   {
     "task": "inventory_reservation_009",
+    "family": null,
     "mutants": 14,
     "killed": 14,
     "fix_mutants": 7,
@@ -48,6 +52,7 @@
   },
   {
     "task": "invoice_sort_001",
+    "family": null,
     "mutants": 4,
     "killed": 4,
     "fix_mutants": 4,
@@ -56,6 +61,7 @@
   },
   {
     "task": "invoice_split_rounding_005",
+    "family": null,
     "mutants": 10,
     "killed": 10,
     "fix_mutants": 4,
@@ -64,6 +70,7 @@
   },
   {
     "task": "invoice_tenant_002",
+    "family": null,
     "mutants": 7,
     "killed": 7,
     "fix_mutants": 1,
@@ -72,6 +79,7 @@
   },
   {
     "task": "late_fees_014",
+    "family": null,
     "mutants": 35,
     "killed": 28,
     "fix_mutants": 14,
@@ -130,6 +138,7 @@
   },
   {
     "task": "loyalty_points_expiry_012",
+    "family": null,
     "mutants": 40,
     "killed": 40,
     "fix_mutants": 27,
@@ -138,6 +147,7 @@
   },
   {
     "task": "orders_pagination_004",
+    "family": null,
     "mutants": 23,
     "killed": 22,
     "fix_mutants": 5,
@@ -154,6 +164,7 @@
   },
   {
     "task": "profile_mass_assignment_016",
+    "family": null,
     "mutants": 7,
     "killed": 7,
     "fix_mutants": 4,
@@ -162,6 +173,7 @@
   },
   {
     "task": "report_auth_003",
+    "family": null,
     "mutants": 2,
     "killed": 2,
     "fix_mutants": 0,
@@ -170,6 +182,7 @@
   },
   {
     "task": "revenue_double_count_007",
+    "family": null,
     "mutants": 1,
     "killed": 1,
     "fix_mutants": 0,
@@ -178,6 +191,7 @@
   },
   {
     "task": "shipping_quote_013",
+    "family": null,
     "mutants": 28,
     "killed": 26,
     "fix_mutants": 12,
@@ -201,6 +215,7 @@
   },
   {
     "task": "subscription_proration_008",
+    "family": null,
     "mutants": 16,
     "killed": 16,
     "fix_mutants": 4,
@@ -209,6 +224,7 @@
   },
   {
     "task": "tiered_pricing_010",
+    "family": null,
     "mutants": 18,
     "killed": 15,
     "fix_mutants": 12,
@@ -239,6 +255,7 @@
   },
   {
     "task": "webhook_signature_017",
+    "family": null,
     "mutants": 17,
     "killed": 15,
     "fix_mutants": 10,

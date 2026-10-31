@@ -23,7 +23,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp
       - name: Unit tests (no database)
-        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py tests/test_mutants.py
+        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py tests/test_mutants.py tests/test_factory.py
       - name: Patch tasks score as expected in the Docker sandbox (gold and noop 3 runs each; no exploit solved)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
@@ -54,6 +54,11 @@ jobs:
       - run: uv sync --extra mcp
       - name: Mutation testing (no unreviewed survivors)
         run: uv run python runtime/mutants.py --workers 4 --check
+      - name: Factory tasks validate and pass mutation testing
+        run: |
+          uv run python -m factory.generate --count 2 --seed 1 --out .tmp/factory
+          uv run python runtime/validate_tasks.py --tasks-dir .tmp/factory
+          uv run python runtime/mutants.py --tasks-dir .tmp/factory --workers 4 --check
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.

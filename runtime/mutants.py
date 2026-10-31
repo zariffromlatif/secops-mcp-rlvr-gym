@@ -40,6 +40,7 @@ from score_patch import ROOT, TMP_ROOT, apply_patch, prepare_workdir
 
 ADMIN_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg://gym:gym@localhost:5433/gym")
 OUT = ROOT / "results" / "mutation"
+REVIEWED = [OUT / "equivalent.yaml", ROOT / "factory" / "equivalent.yaml"]  # survivors found harmless
 
 COMPARE_SWAPS = {"<=": "<", "<": "<=", ">=": ">", ">": ">=", "==": "!=", "!=": "=="}
 BINOP_SWAPS = {"+": "-", "-": "+", "//": "/", "/": "//", "*": "+"}
@@ -174,7 +175,8 @@ def worker_databases(n: int) -> list[str]:
 
 def mutate_task(task_dir: Path, db_urls: list[str], limit: int) -> dict:
     task_dir = task_dir.resolve()
-    spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
+    task = yaml.safe_load((task_dir / "task.yaml").read_text())
+    spec = task["scoring"]
     targets = spec["regression"] + (spec.get("security") or spec["target"])
     TMP_ROOT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="mut-", dir=TMP_ROOT) as tmp:
@@ -211,6 +213,7 @@ def mutate_task(task_dir: Path, db_urls: list[str], limit: int) -> dict:
     in_fix = [(m, k) for m, k in results if m.in_fix]
     return {
         "task": task_dir.name,
+        "family": task.get("family"),
         "mutants": len(results),
         "killed": sum(k for _, k in results),
         "fix_mutants": len(in_fix),
@@ -223,12 +226,20 @@ def survivor_key(task: str, s: dict) -> str:
     return f"{task} L{s['line']} {s['before']} -> {s['after']}"
 
 
+def review(reviewed: dict, row: dict, s: dict) -> str | None:
+    """Why a survivor is harmless, from its task's entry or, for generated tasks, its family's."""
+    keys = [survivor_key(row["task"], s)] + ([survivor_key(f"family:{row['family']}", s)] if row.get("family") else [])
+    return next((reviewed[k] for k in keys if k in reviewed), None)
+
+
 def write_report(rows: list[dict]) -> list[str]:
     """Write README.md and mutants.json; return the survivors nobody has reviewed yet."""
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "mutants.json").write_text(json.dumps(rows, indent=2) + "\n")
-    reviewed_path = OUT / "equivalent.yaml"
-    reviewed = (yaml.safe_load(reviewed_path.read_text()) or {}) if reviewed_path.exists() else {}
+    reviewed = {}
+    for path in REVIEWED:
+        if path.exists():
+            reviewed.update(yaml.safe_load(path.read_text()) or {})
     lines = [
         "# Mutation testing",
         "",
@@ -245,7 +256,7 @@ def write_report(rows: list[dict]) -> list[str]:
         if "error" in r:
             lines.append(f"| `{r['task']}` | error: {r['error']} | | | | |")
             continue
-        open_ = [s for s in r["survivors"] if survivor_key(r["task"], s) not in reviewed]
+        open_ = [s for s in r["survivors"] if review(reviewed, r, s) is None]
         unreviewed += [(r["task"], s) for s in open_]
         rate = r["killed"] / r["mutants"] if r["mutants"] else 0
         lines.append(f"| `{r['task']}` | {r['mutants']} | {r['killed']} | {rate:.0%} | "
@@ -253,7 +264,7 @@ def write_report(rows: list[dict]) -> list[str]:
     lines += ["", "## Survivors", ""]
     for r in rows:
         for s in r.get("survivors", []):
-            reason = reviewed.get(survivor_key(r["task"], s), "**UNREVIEWED**")
+            reason = review(reviewed, r, s) or "**UNREVIEWED**"
             lines.append(f"- `{survivor_key(r['task'], s)}` ({s['kind']}): {reason}")
     if not any(r.get("survivors") for r in rows):
         lines.append("None.")
@@ -267,10 +278,12 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--limit", type=int, default=60, help="mutants per task (fixed lines first)")
     parser.add_argument("--check", action="store_true", help="exit 1 if a survivor is not in equivalent.yaml")
+    parser.add_argument("--tasks-dir", type=Path, default=ROOT / "tasks",
+                        help="another folder (e.g. factory output) gets its report in <folder>/mutation/")
     args = parser.parse_args()
     db_urls = worker_databases(args.workers)
     rows = []
-    for spec in sorted((ROOT / "tasks").glob("*/task.yaml")):
+    for spec in sorted(args.tasks_dir.resolve().glob("*/task.yaml")):
         if args.only and spec.parent.name not in args.only:
             continue
         row = mutate_task(spec.parent, db_urls, args.limit)
@@ -281,6 +294,9 @@ def main() -> int:
             print(f"{row['task']}: killed {row['killed']}/{row['mutants']}, fixed lines {row['fix_killed']}/{row['fix_mutants']}")
     if args.only:
         return 0
+    global OUT
+    if args.tasks_dir.resolve() != (ROOT / "tasks").resolve():
+        OUT = args.tasks_dir / "mutation"
     unreviewed = write_report(rows)
     for key in unreviewed:
         print(f"UNREVIEWED survivor: {key}")
