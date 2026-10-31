@@ -122,7 +122,10 @@ def report(rows: list[dict], stats: dict) -> str:
             "",
         ]
     if stats.get("known"):
-        lines += [f"Known-answer solutions (gold fixes, exploits, careless trajectories): {stats['known']}", ""]
+        lines += [f"Known-answer solutions (gold fixes, exploits, careless trajectories): {stats['known']}", "",
+                  "Every exploit and careless trajectory is checked to be rejected by V3 when it is added, so "
+                  "V3's rates on these solutions are 0 by construction. They show what the other verifiers "
+                  "miss; V3's own error rate needs human labels or new attacks (audit/hacker.py).", ""]
     lines += [
         "| Verifier | n (wrong / right) | False-positive rate (95% CI) | False-negative rate (95% CI) | Accuracy |",
         "|---|---|---|---|---|",
