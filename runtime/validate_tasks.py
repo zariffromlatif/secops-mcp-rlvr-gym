@@ -1,10 +1,13 @@
-"""Check every task: gold.patch must be fully solved, noop.patch must score zero on security.
+"""Check every task: gold.patch must be fully solved, noop.patch must score zero on security,
+and no patch in exploits/ (test or seed edits, special-casing, partial or destructive fixes)
+may be solved.
 
     uv run python runtime/validate_tasks.py                      # local, fast
     uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
+    uv run python runtime/validate_tasks.py --sandbox docker --only tiered_pricing_010
 
-With --repeat, every patch is scored several times and any score drift fails
-the task as flaky.
+With --repeat, gold and noop are scored several times and any score drift fails
+the task as flaky. Exploits are scored once.
 """
 
 from __future__ import annotations
@@ -19,24 +22,35 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sandbox", choices=["local", "docker"], default="local")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--only", nargs="*", help="task ids to check (default: all)")
     args = parser.parse_args()
 
     failures = 0
     for spec in sorted((ROOT / "tasks").glob("*/task.yaml")):
         task_dir = spec.parent
+        if args.only and task_dir.name not in args.only:
+            continue
         golds = [score_patch(task_dir, task_dir / "gold.patch", args.sandbox) for _ in range(args.repeat)]
         noops = [score_patch(task_dir, task_dir / "noop.patch", args.sandbox) for _ in range(args.repeat)]
+        exploits = {p.stem: score_patch(task_dir, p, args.sandbox) for p in sorted(task_dir.glob("exploits/*.patch"))}
         gold, noop = golds[0], noops[0]
         stable = len({g.total for g in golds}) == 1 and len({n.total for n in noops}) == 1
-        ok = stable and gold.solved and gold.normalized == 1.0 and not noop.solved and noop.security == 0
+        solved_exploits = [name for name, r in exploits.items() if r.solved]
+        ok = (
+            stable and gold.solved and gold.normalized == 1.0 and not noop.solved and noop.security == 0
+            and not solved_exploits
+        )
         failures += not ok
         print(
             f"{'PASS' if ok else 'FAIL'}  {task_dir.name}  "
-            f"gold={gold.normalized:.2f}  noop={noop.normalized:.2f}"
+            f"gold={gold.normalized:.2f}  noop={noop.normalized:.2f}  "
+            f"exploits blocked={len(exploits) - len(solved_exploits)}/{len(exploits)}"
             + ("" if stable else "  FLAKY")
         )
         if not ok:
             print(f"      gold notes: {gold.notes}\n      noop notes: {noop.notes}")
+            for name in solved_exploits:
+                print(f"      exploit solved: {name}")
     return 1 if failures else 0
 
 

@@ -24,7 +24,7 @@ jobs:
       - run: uv sync --extra mcp
       - name: Unit tests (no database)
         run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py
-      - name: Patch tasks score as expected in the Docker sandbox (3 runs each)
+      - name: Patch tasks score as expected in the Docker sandbox (gold and noop 3 runs each; no exploit solved)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
         run: uv run python runtime/workflows.py validate
@@ -57,6 +57,8 @@ jobs:
         run: uv run pytest -q tests
       - name: Build task image
         run: sh scripts/build_task_image.sh
+      - name: In-box scorer resists report rewriting and port squatting
+        run: uv run python scripts/check_box_exploits.py
       - name: vf-validate secops_gym_patches (gold + noop, Docker runtime)
         run: |
           uv run vf-validate secops_gym_patches --runtime.type docker --timeout.setup 300 --timeout.total 600 -o vf-out/patches
