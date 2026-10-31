@@ -6,12 +6,31 @@ import pytest
 
 from factory.families import FAMILIES
 from factory.generate import generate
+from verifier.canary import CANARY, answer_file
 
 
 @pytest.mark.parametrize("family", sorted(FAMILIES))
 def test_same_seed_same_task(family):
     assert generate(family, 3, 0) == generate(family, 3, 0)
     assert generate(family, 3, 0)[1] != generate(family, 3, 1)[1]
+
+
+@pytest.mark.parametrize("family", sorted(FAMILIES))
+def test_a_secret_gives_other_tasks_and_ids_that_do_not_reveal_it(family):
+    public_id, public = generate(family, 3, 0)
+    private_id, private = generate(family, 3, 0, secret="s3cret-value")
+    assert private != public and private == generate(family, 3, 0, secret="s3cret-value")[1]
+    assert "s3cret" not in private_id and private_id != public_id
+    assert generate(family, 3, 0, secret="other")[1] != private
+
+
+@pytest.mark.parametrize("family", sorted(FAMILIES))
+def test_answer_files_carry_the_canary(family):
+    _, files = generate(family, 1, 0)
+    assert {rel for rel in files if answer_file(rel)} >= {"gold.patch", "hidden/test_regression_hidden.py",
+                                                          "exploits/edit_seed.patch"}
+    for rel, content in files.items():
+        assert (CANARY in content) == answer_file(rel), rel
 
 
 @pytest.mark.parametrize("family", sorted(FAMILIES))
