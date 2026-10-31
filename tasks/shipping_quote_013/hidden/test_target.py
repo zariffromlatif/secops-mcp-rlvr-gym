@@ -23,3 +23,7 @@ def test_volumetric_exactly_one_kilo(client):
 def test_each_package_rounded_separately(client):
     r = quote(client, "DHK", box(600), box(600)).json()
     assert r["total_cents"] == 600
+
+
+def test_one_gram_over_a_step_bills_the_next_step(client):
+    assert quote(client, "DHK", box(5001)).json()["packages"] == [{"billable_kg": 5.5, "cents": 1650}]

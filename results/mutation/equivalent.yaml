@@ -1,0 +1,16 @@
+# Surviving mutants reviewed by hand and found harmless: they behave like the gold fix for every
+# input the task allows. Key: "<task> L<line> <before> -> <after>". The mutation report marks every
+# other survivor UNREVIEWED: each is a gap in the tests until shown otherwise.
+idempotency_keys_011 L38 201 -> 202: the handler sets response.status_code itself
+idempotency_keys_011 L38 201 -> 200: the handler sets response.status_code itself
+late_fees_014 L41 1 -> 2: Decimal(2) and Decimal(1) have the same exponent, so quantize rounds the same
+late_fees_014 L41 1 -> 0: Decimal(0) and Decimal(1) have the same exponent, so quantize rounds the same
+late_fees_014 L52 <= -> <: with nothing outstanding, or zero days late, both branches give a fee of 0
+late_fees_014 L52 0 -> -1: zero outstanding or zero days late give a fee of 0 on either branch
+late_fees_014 L52 0 -> 1: a 1-cent outstanding balance only; 2% of 1 cent rounds to 0 anyway
+orders_pagination_004 L18 1 -> 0: max(0, ...) differs only for an empty table; the seed has 9 orders
+shipping_quote_013 L45 // -> /: a fractional gram is rounded up to the same 0.5 kg step
+shipping_quote_013 L47 1 -> 0: weights are > 0, so there is always at least one 0.5 kg step
+tiered_pricing_010 L34 > -> >=: a tier is only visited with units > 0, because the loop stops at the last tier used
+tiered_pricing_010 L34 0 -> -1: a tier is only visited with units > 0, because the loop stops at the last tier used
+tiered_pricing_010 L38 <= -> <: on an exact bound the next tier gets 0 units, which `if units > 0` skips

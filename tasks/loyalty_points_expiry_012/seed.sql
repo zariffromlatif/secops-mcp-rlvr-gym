@@ -11,7 +11,7 @@ CREATE TABLE point_events (
 );
 
 INSERT INTO customers VALUES
-    (1, 'Ayesha'), (2, 'Bashir'), (3, 'Chandni'), (4, 'Dipu'), (5, 'Esha'), (6, 'Farhan');
+    (1, 'Ayesha'), (2, 'Bashir'), (3, 'Chandni'), (4, 'Dipu'), (5, 'Esha'), (6, 'Farhan'), (7, 'Gita');
 
 INSERT INTO point_events (customer_id, kind, points, occurred_on) VALUES
     (1, 'earn',   200, '2025-11-01'),
@@ -26,4 +26,7 @@ INSERT INTO point_events (customer_id, kind, points, occurred_on) VALUES
     (5, 'earn',   100, '2025-01-10'),
     (5, 'earn',   100, '2025-12-01'),
     (5, 'redeem',  70, '2025-12-15'),
-    (6, 'earn',    40, '2025-02-01');
+    (6, 'earn',    40, '2025-02-01'),
+    (7, 'earn',    30, '2025-01-10'),
+    (7, 'earn',   100, '2025-06-01'),
+    (7, 'redeem',  50, '2025-12-15');

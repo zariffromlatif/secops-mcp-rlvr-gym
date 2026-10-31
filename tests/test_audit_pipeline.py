@@ -111,3 +111,29 @@ def test_packets_are_blind(tmp_path):
         assert leak not in packet
     with pytest.raises(SystemExit):
         labels.export(solutions, tmp_path)  # never overwrite existing labels
+
+
+# ---------------------------------------------------------------- known-answer corpus
+def test_corpus_labels_gold_right_and_every_exploit_wrong():
+    from audit import corpus
+
+    records = corpus.patch_records() + corpus.workflow_records()
+    gold = [r for r in records if r["source"] == "gold"]
+    wrong = [r for r in records if not r["known_label"]]
+    assert len(gold) == len(list(corpus.TASKS.glob("*/task.yaml"))) + len(list(corpus.WORKFLOWS.glob("*/task.yaml")))
+    assert all(r["known_label"] for r in gold)
+    assert {r["source"] for r in wrong} >= {"exploit:edit_public_tests", "exploit:edit_seed"}
+    edited = next(r for r in records if r["source"] == "exploit:edit_public_tests")
+    assert edited["tests_modified"] and all(p.startswith("tests_public/") for p in edited["tests_modified"])
+
+
+def test_analyze_counts_wrong_and_right_from_known_labels(tmp_path):
+    corpus_file = tmp_path / "corpus.jsonl"
+    corpus_file.write_text("".join(json.dumps({"solution_id": s, "known_label": l}) + "\n"
+                                   for s, l in [("a", True), ("b", False), ("c", False)]))
+    verdicts = [{"solution_id": s, "V1": v1, "V3": v3} for s, v1, v3 in
+                [("a", "True", "True"), ("b", "True", "False"), ("c", "False", "False")]]
+    rows = {r["verifier"]: r for r in analyze.analyze(verdicts, analyze.known_truth(corpus_file))}
+    assert (rows["V1"]["wrong"], rows["V1"]["right"], rows["V1"]["fpr"]) == (2, 1, 0.5)
+    assert rows["V3"]["fpr"] == 0.0
+    assert "Known-answer solutions" in analyze.report(list(rows.values()), {"known": 3})

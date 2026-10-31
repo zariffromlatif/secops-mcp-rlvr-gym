@@ -1,7 +1,8 @@
 """Compare each verifier with the human labels: the paper's main results table.
 
 Ground truth = the label both annotators gave; for disagreements, the label in resolved.csv.
-Disagreements not yet resolved are left out and counted.
+Disagreements not yet resolved are left out and counted. Known-answer solutions (audit.corpus:
+gold fixes, exploits, careless trajectories) carry their own labels and need no annotators.
 
 For each verifier we report, with 95% bootstrap confidence intervals over solutions:
     false-positive rate  P(verifier passes | label fail): wrong solutions it would reward
@@ -9,16 +10,18 @@ For each verifier we report, with 95% bootstrap confidence intervals over soluti
     accuracy
 
     python -m audit.analyze results/audit/verdicts.csv results/audit/labeling [--out results/audit/report.md]
+    python -m audit.analyze results/audit/corpus_verdicts.csv --known results/audit/corpus.jsonl
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 import random
 from pathlib import Path
 
-VERIFIERS = ["V1", "V2", "V3", "V4"]
+VERIFIERS = ["V1", "V2", "V3", "V4", "V5"]
 
 
 def _read(path: Path) -> list[dict]:
@@ -49,6 +52,8 @@ def rates(pairs: list[tuple[bool, bool]]) -> dict:
     tp = sum(v and g for v, g in pairs)
     return {
         "n": len(pairs),
+        "wrong": fp + tn,
+        "right": fn + tp,
         "fpr": fp / (fp + tn) if fp + tn else float("nan"),
         "fnr": fn / (fn + tp) if fn + tp else float("nan"),
         "acc": (tp + tn) / len(pairs) if pairs else float("nan"),
@@ -88,6 +93,11 @@ def ground_truth(labeling: Path) -> tuple[dict[str, bool], dict]:
     return truth, stats
 
 
+def known_truth(corpus: Path) -> dict[str, bool]:
+    rows = (json.loads(line) for line in corpus.read_text(encoding="utf-8").splitlines() if line.strip())
+    return {r["solution_id"]: bool(r["known_label"]) for r in rows if "known_label" in r}
+
+
 def analyze(verdicts: list[dict], truth: dict[str, bool]) -> list[dict]:
     rows = []
     for v in VERIFIERS:
@@ -104,32 +114,46 @@ def _pct(x: float) -> str:
 
 
 def report(rows: list[dict], stats: dict) -> str:
-    lines = [
-        "# Verifier audit",
-        "",
-        f"Packets: {stats['packets']} · labelled by both annotators: {stats['double_labelled']} · "
-        f"unresolved disagreements (excluded): {stats['unresolved']} · Cohen's kappa: {stats['kappa']:.2f}",
-        "",
-        "| Verifier | n | False-positive rate (95% CI) | False-negative rate (95% CI) | Accuracy |",
+    lines = ["# Verifier audit", ""]
+    if stats.get("packets"):
+        lines += [
+            f"Packets: {stats['packets']} · labelled by both annotators: {stats['double_labelled']} · "
+            f"unresolved disagreements (excluded): {stats['unresolved']} · Cohen's kappa: {stats['kappa']:.2f}",
+            "",
+        ]
+    if stats.get("known"):
+        lines += [f"Known-answer solutions (gold fixes, exploits, careless trajectories): {stats['known']}", ""]
+    lines += [
+        "| Verifier | n (wrong / right) | False-positive rate (95% CI) | False-negative rate (95% CI) | Accuracy |",
         "|---|---|---|---|---|",
     ]
     for r in rows:
         lines.append(
-            f"| {r['verifier']} | {r['n']} | {_pct(r['fpr'])} ({_pct(r['fpr_ci'][0])}–{_pct(r['fpr_ci'][1])}) | "
+            f"| {r['verifier']} | {r['n']} ({r['wrong']} / {r['right']}) | "
+            f"{_pct(r['fpr'])} ({_pct(r['fpr_ci'][0])}–{_pct(r['fpr_ci'][1])}) | "
             f"{_pct(r['fnr'])} ({_pct(r['fnr_ci'][0])}–{_pct(r['fnr_ci'][1])}) | {_pct(r['acc'])} |"
         )
-    lines += ["", "V1 public tests · V2 public + hidden tests · V3 multi-signal · V4 LLM judge "
-              "(workflows: V1 goal checks, V3 goal + guard checks)"]
+    lines += ["", "V1 public tests · V2 public + hidden tests · V3 multi-signal · V4 LLM judge · "
+              "V5 LLM judge that runs the code (workflows: V1 goal checks, V3 goal + guard checks)",
+              "", "A false-positive rate rests on the wrong solutions only: about 100 are needed for a "
+              "95% interval of roughly ±10 points."]
     return "\n".join(lines) + "\n"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("verdicts", type=Path)
-    parser.add_argument("labeling", type=Path)
+    parser.add_argument("labeling", type=Path, nargs="?", help="folder with key.csv and sheet_A/B.csv")
+    parser.add_argument("--known", type=Path, help="known-answer solutions from audit.corpus")
     parser.add_argument("--out", type=Path, default=Path("results/audit/report.md"))
     args = parser.parse_args()
-    truth, stats = ground_truth(args.labeling)
+    if not args.labeling and not args.known:
+        parser.error("give a labeling folder, --known, or both")
+    truth, stats = ground_truth(args.labeling) if args.labeling else ({}, {})
+    if args.known:
+        known = known_truth(args.known)
+        truth = {**known, **truth}  # human labels win where both exist
+        stats["known"] = len(known)
     text = report(analyze(_read(args.verdicts), truth), stats)
     args.out.write_text(text, encoding="utf-8")
     print(text)

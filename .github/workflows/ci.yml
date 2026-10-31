@@ -23,13 +23,37 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --extra mcp
       - name: Unit tests (no database)
-        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py
+        run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py tests/test_mutants.py
       - name: Patch tasks score as expected in the Docker sandbox (gold and noop 3 runs each; no exploit solved)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
         run: uv run python runtime/workflows.py validate
       - name: MCP server lists all tools
         run: uv run python -c "import asyncio, sys; sys.path.insert(0, 'runtime'); import mcp_server; print([t.name for t in asyncio.run(mcp_server.server.list_tools())])"
+
+  mutation:
+    # Small wrong variants of every gold fix must fail some test, unless reviewed as equivalent.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gym
+          POSTGRES_PASSWORD: gym
+          POSTGRES_DB: gym
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gym"
+          --health-interval 2s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+      - run: uv sync --extra mcp
+      - name: Mutation testing (no unreviewed survivors)
+        run: uv run python runtime/mutants.py --workers 4 --check
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.

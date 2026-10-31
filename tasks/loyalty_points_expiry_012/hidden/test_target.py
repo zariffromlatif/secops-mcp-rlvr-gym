@@ -22,3 +22,10 @@ def test_expire_on_day_365(client):
 def test_cannot_redeem_expired_points(client):
     assert redeem(client, 3, 200, "2026-01-10").status_code == 409
     assert balance(client, 3, "2026-01-10").json()["balance"] == 120
+
+
+def test_redemption_spanning_two_lots(client):
+    # 50 points use all 30 from January 2025, then 20 of the 100 from June 2025.
+    assert balance(client, 7, "2026-01-15").json()["balance"] == 80
+    # The June lot (80 left) expires on 2026-06-01.
+    assert balance(client, 7, "2026-06-01").json()["balance"] == 0

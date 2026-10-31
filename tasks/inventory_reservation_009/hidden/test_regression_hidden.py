@@ -19,3 +19,8 @@ def test_release_unknown_order(client):
 def test_duplicate_sku_lines_within_stock(client):
     assert reserve(client, "ORD-8", ("PEN-01", 2), ("PEN-01", 2)).status_code == 200
     assert stock_of("PEN-01") == 1
+
+
+def test_zero_quantity_and_empty_orders_rejected(client):
+    assert reserve(client, "ORD-10", ("PEN-01", 0)).status_code == 422
+    assert client.post("/orders/ORD-11/reserve", json={"lines": []}).status_code == 422

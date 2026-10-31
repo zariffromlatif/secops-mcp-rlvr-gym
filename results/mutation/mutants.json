@@ -1,0 +1,224 @@
+[
+  {
+    "task": "daily_report_timezone_006",
+    "mutants": 10,
+    "killed": 10,
+    "fix_mutants": 5,
+    "fix_killed": 5,
+    "survivors": []
+  },
+  {
+    "task": "idempotency_keys_011",
+    "mutants": 12,
+    "killed": 10,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": [
+      {
+        "line": 38,
+        "kind": "constant",
+        "before": "201",
+        "after": "202",
+        "in_fix": false
+      },
+      {
+        "line": 38,
+        "kind": "constant",
+        "before": "201",
+        "after": "200",
+        "in_fix": false
+      }
+    ]
+  },
+  {
+    "task": "inventory_reservation_009",
+    "mutants": 14,
+    "killed": 14,
+    "fix_mutants": 7,
+    "fix_killed": 7,
+    "survivors": []
+  },
+  {
+    "task": "invoice_sort_001",
+    "mutants": 4,
+    "killed": 4,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": []
+  },
+  {
+    "task": "invoice_split_rounding_005",
+    "mutants": 10,
+    "killed": 10,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": []
+  },
+  {
+    "task": "invoice_tenant_002",
+    "mutants": 7,
+    "killed": 7,
+    "fix_mutants": 1,
+    "fix_killed": 1,
+    "survivors": []
+  },
+  {
+    "task": "late_fees_014",
+    "mutants": 35,
+    "killed": 28,
+    "fix_mutants": 14,
+    "fix_killed": 14,
+    "survivors": [
+      {
+        "line": 41,
+        "kind": "constant",
+        "before": "1",
+        "after": "2",
+        "in_fix": false
+      },
+      {
+        "line": 41,
+        "kind": "constant",
+        "before": "1",
+        "after": "0",
+        "in_fix": false
+      },
+      {
+        "line": 52,
+        "kind": "comparison",
+        "before": "<=",
+        "after": "<",
+        "in_fix": false
+      },
+      {
+        "line": 52,
+        "kind": "comparison",
+        "before": "<=",
+        "after": "<",
+        "in_fix": false
+      },
+      {
+        "line": 52,
+        "kind": "constant",
+        "before": "0",
+        "after": "1",
+        "in_fix": false
+      },
+      {
+        "line": 52,
+        "kind": "constant",
+        "before": "0",
+        "after": "-1",
+        "in_fix": false
+      },
+      {
+        "line": 52,
+        "kind": "constant",
+        "before": "0",
+        "after": "-1",
+        "in_fix": false
+      }
+    ]
+  },
+  {
+    "task": "loyalty_points_expiry_012",
+    "mutants": 40,
+    "killed": 40,
+    "fix_mutants": 27,
+    "fix_killed": 27,
+    "survivors": []
+  },
+  {
+    "task": "orders_pagination_004",
+    "mutants": 23,
+    "killed": 22,
+    "fix_mutants": 5,
+    "fix_killed": 4,
+    "survivors": [
+      {
+        "line": 18,
+        "kind": "constant",
+        "before": "1",
+        "after": "0",
+        "in_fix": true
+      }
+    ]
+  },
+  {
+    "task": "report_auth_003",
+    "mutants": 2,
+    "killed": 2,
+    "fix_mutants": 0,
+    "fix_killed": 0,
+    "survivors": []
+  },
+  {
+    "task": "revenue_double_count_007",
+    "mutants": 1,
+    "killed": 1,
+    "fix_mutants": 0,
+    "fix_killed": 0,
+    "survivors": []
+  },
+  {
+    "task": "shipping_quote_013",
+    "mutants": 28,
+    "killed": 26,
+    "fix_mutants": 12,
+    "fix_killed": 10,
+    "survivors": [
+      {
+        "line": 45,
+        "kind": "arithmetic",
+        "before": "//",
+        "after": "/",
+        "in_fix": true
+      },
+      {
+        "line": 47,
+        "kind": "constant",
+        "before": "1",
+        "after": "0",
+        "in_fix": true
+      }
+    ]
+  },
+  {
+    "task": "subscription_proration_008",
+    "mutants": 16,
+    "killed": 16,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": []
+  },
+  {
+    "task": "tiered_pricing_010",
+    "mutants": 18,
+    "killed": 15,
+    "fix_mutants": 12,
+    "fix_killed": 9,
+    "survivors": [
+      {
+        "line": 34,
+        "kind": "comparison",
+        "before": ">",
+        "after": ">=",
+        "in_fix": true
+      },
+      {
+        "line": 34,
+        "kind": "constant",
+        "before": "0",
+        "after": "-1",
+        "in_fix": true
+      },
+      {
+        "line": 38,
+        "kind": "comparison",
+        "before": "<=",
+        "after": "<",
+        "in_fix": true
+      }
+    ]
+  }
+]
