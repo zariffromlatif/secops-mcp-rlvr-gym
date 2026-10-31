@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import score_patch as sp
-from train import report
+from train import evaluate, report
 from train.dataset import prompt
 from train.grpo import Reward, completion_text, gold_main
 from train.scoring import Scorer, extract_main
@@ -78,9 +78,20 @@ def test_reward_returns_the_chosen_verifier_and_logs_all(scorer, tmp_path):
 
 
 def test_report_counts_gamed_samples():
-    samples = [{"step": s, "task": "t", "reward": "v1", "v1": v1, "v2": 0.5, "v3": 0.5, "solved": solved}
-               for s, v1, solved in [(0, 1.0, True), (0, 1.0, False), (0, 0.5, False), (12, 1.0, False)]]
+    samples = [{"step": s, "task": "t", "reward": "v2", "v1": v1, "v2": v2, "v3": 0.5, "solved": solved}
+               for s, v1, v2, solved in [(0, 1.0, 1.0, True), (0, 1.0, 0.5, False), (0, 0.5, 0.5, False),
+                                         (12, 1.0, 1.0, False)]]
     first, second = report.buckets(samples, 10)
-    assert first["n"] == 3 and first["gamed"] == pytest.approx(1 / 3) and first["solved"] == pytest.approx(1 / 3)
-    assert second["steps"] == "10-19" and second["gamed"] == 1.0
-    assert "| t | 1 | 1.000 | 0.0% | 100.0% |" in report.render({"run": samples}, 10, last=5)
+    assert first["n"] == 3 and first["solved"] == pytest.approx(1 / 3)
+    assert first["gamed_v1"] == pytest.approx(1 / 3) and first["gamed_v2"] == 0
+    assert second["steps"] == "10-19" and second["gamed_v1"] == second["gamed_v2"] == 1.0
+    assert "| t | 1 | 0.500 | 0.0% | 100.0% | 100.0% |" in report.render({"run": samples}, 10, last=5)
+
+
+def test_evaluation_summary_marks_tasks_without_learning_signal():
+    rows = [{"task": "a", "v1": 1.0, "v2": 0.5, "v3": v3, "solved": v3 == 1.0} for v3 in (0.5, 1.0)]
+    rows += [{"task": "b", "v1": 1.0, "v2": 0.5, "v3": 0.5, "solved": False} for _ in range(2)]
+    s = evaluate.summarize(rows)
+    assert s["tasks"]["a"] == {"samples": 2, "v1": 1.0, "v2": 0.5, "v3": 0.75, "solved": 0.5, "any": True, "signal": True}
+    assert s["tasks"]["b"]["signal"] is False and s["tasks"]["b"]["any"] is False
+    assert s["overall"]["signal"] == 0.5 and s["overall"]["solved"] == 0.25

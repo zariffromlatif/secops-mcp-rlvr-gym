@@ -39,33 +39,85 @@ machine):
 Report results from an isolated run: a reward the policy can game in-process measures the sandbox,
 not the verifier.
 
+## Which rewards to compare
+
+In this single-turn format the answer is only `app/main.py`, so editing tests or seed data is
+impossible, and the sandbox closes in-process tricks. What is left for a reward to get wrong:
+
+- **V1** pays the unchanged buggy code in full (public tests don't catch the bugs), so most groups
+  of answers get the same reward and GRPO has almost nothing to learn from. A V1 run shows how
+  little a test-only reward teaches; it can't show cheating.
+- **V2** pays every answer that passes all tests, including SQL built from strings, which only V3's
+  static gate rejects. Its `gamed v2` rate (all tests pass, not solved) is the one to watch.
+- **V3** is the full reward.
+
+The informative pair is **V2 vs V3**, same model, seed and steps; add V1 if time allows. Evaluate both
+adapters on tasks they weren't trained on, so learning the tasks by heart doesn't count as learning
+to fix bugs.
+
 ## Running
 
 ```bash
-docker compose -f runtime/docker-compose.yml up -d --wait   # only for --sandbox local
+uv pip install -r train/requirements.txt     # CUDA GPU; these packages are not in the main lockfile
 
-# No model, no GPU: score every gold fix and every buggy original through the training reward.
-uv run python -m train.grpo --dry-run
+# 0. No model: score every gold fix and every buggy original through the training reward.
+uv run --no-sync python -m train.grpo --dry-run
 
-# Training (CUDA GPU; packages not in the main lockfile)
-uv pip install -r train/requirements.txt
-uv run python -m train.grpo --model Qwen/Qwen2.5-Coder-7B-Instruct --reward v1 --out results/train/v1 \
-    --load-in-4bit --steps 200
-uv run python -m train.grpo --model Qwen/Qwen2.5-Coder-7B-Instruct --reward v3 --out results/train/v3 \
-    --load-in-4bit --steps 200
-uv run python -m train.report results/train/v1 results/train/v3 --out results/train/README.md
+# 1. Held-out tasks nobody else can rebuild (keep the secret outside the repository)
+export GYM_FACTORY_SECRET="$(openssl rand -hex 16)"
+uv run --no-sync python -m factory.generate --count 3 --out tasks_private
+uv run --no-sync python -m factory.generate --count 3 --seed 1 --secret "" --out tasks_generated  # more training tasks
+uv run --no-sync python runtime/validate_tasks.py --tasks-dir tasks_private --sandbox warm
+uv run --no-sync python runtime/validate_tasks.py --tasks-dir tasks_generated --sandbox warm
+
+# 2. Baseline: does the base model get partial credit, with different rewards across its answers?
+uv run --no-sync python -m train.evaluate -k 8 --out results/train/eval-base
+uv run --no-sync python -m train.evaluate -k 8 --tasks tasks_private --out results/train/eval-base-heldout
+
+# 3. Smoke run: 2 steps, to measure seconds per step and GPU memory (watch nvidia-smi)
+uv run --no-sync python -m train.grpo --steps 2 --out results/train/smoke
+
+# 4. The runs (--resume continues after a session ends)
+uv run --no-sync python -m train.grpo --reward v3 --tasks tasks tasks_generated --steps 200 --out results/train/v3
+uv run --no-sync python -m train.grpo --reward v2 --tasks tasks tasks_generated --steps 200 --out results/train/v2
+
+# 5. Compare
+uv run --no-sync python -m train.report results/train/v2 results/train/v3 --out results/train/README.md
+uv run --no-sync python -m train.evaluate -k 8 --tasks tasks_private --adapter results/train/v3/final \
+    --out results/train/eval-v3-heldout     # and the same for v2
 ```
 
-[grpo.py](grpo.py) wraps TRL's `GRPOTrainer` with a LoRA adapter (`--lora-r`, default 16) and
-optional 4-bit loading. Every scored sample is appended to `<out>/samples.jsonl` with its step, task,
-v1/v2/v3, `solved` and the gate notes; v1/v2/v3/solved means also go to the trainer's logs as
-`verifier/*`. `--tasks tasks tasks_generated` adds factory tasks (see [factory/](../factory));
-`--hold-out <task ids>` keeps tasks out of training.
+`uv run --no-sync` keeps uv from removing the training packages, which aren't in the lockfile.
 
-[report.py](report.py) prints, per block of steps, the mean of each verifier, the solved rate and the
-**gamed** rate: samples with v1 = 1 that are not solved, i.e. answers a test-only verifier pays in
-full that the full verifier rejects. A V1 run whose v1 climbs while solved stays flat and gamed grows
-is learning the tests, not the fixes.
+[grpo.py](grpo.py) wraps TRL's `GRPOTrainer` with a LoRA adapter (`--lora-r`, default 16). Each step
+scores 32 answers: 4 tasks x 8 answers (`--batch 4 --grad-accum 8 --num-generations 8`). Every
+scored answer is appended to `<out>/samples.jsonl` with its step, task, v1/v2/v3, `solved` and the gate
+notes; the means also go to the trainer's logs as `verifier/*`. A checkpoint is saved every 25 steps
+and `--resume` continues from the last one. `--hold-out <task ids>` keeps tasks out of training.
 
-No training run is checked in: this container has no GPU. CI runs `--dry-run` and
-[tests/test_train.py](../tests/test_train.py).
+[evaluate.py](evaluate.py) samples k answers per task from the base model or a trained adapter and
+scores them: mean v1/v2/v3, pass@1, pass@k, and whether a task gives a learning **signal** (its
+answers got different rewards). Tasks where every answer gets the same reward teach GRPO nothing;
+if most tasks have no signal, pick a stronger or weaker model.
+
+[report.py](report.py) prints, per block of steps, the mean of each verifier, the solved rate and
+two **gamed** rates: v1 = 1 but not solved (the unchanged code is there), and v2 = 1 but not solved
+(every test passes, the full verifier rejects it).
+
+## On a 16 GB GPU (RTX 4080 Super)
+
+Prompts are 900-1,700 tokens and gold answers 160-880 (Qwen2.5 tokenizer), so the default
+`--max-completion-length 1536` is enough.
+
+| Model | How | Fits |
+|---|---|---|
+| Qwen2.5-Coder-1.5B-Instruct (default) | bf16 + LoRA | yes, with room to spare: start here |
+| Qwen2.5-Coder-3B-Instruct | bf16 + LoRA | likely; lower `--batch` to 2 (and raise `--grad-accum` to 16) if it runs out of memory |
+| Qwen2.5-Coder-7B-Instruct | `--load-in-4bit` (QLoRA) | tight, and generation is slow in 4-bit; not for a first run |
+
+Generation will take most of each step; scoring 32 answers with 8 warm workers takes about 7 s.
+Measure seconds per step in the smoke run before planning: 200 steps at 90 s each is 5 hours.
+
+No training run is checked in yet. CI runs `--dry-run`, [tests/test_train.py](../tests/test_train.py)
+and a 2-step training plus evaluation with a tiny model on CPU, so the code path you run on the GPU
+is exercised on every push.

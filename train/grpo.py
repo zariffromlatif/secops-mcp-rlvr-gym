@@ -63,6 +63,7 @@ class Reward:
                     "step": step, "task": Path(folder).name, "reward": self.choice,
                     **{k: round(r[k], 4) for k in REWARDS}, "solved": r["solved"], "notes": r["notes"],
                     "chars": len(text), "sha": hashlib.sha256(text.encode()).hexdigest()[:12],
+                    "answer": text,  # to see what a policy learned, gamed answers above all
                 }) + "\n")
         if log_metric is not None:
             for key in REWARDS:
@@ -105,11 +106,15 @@ def dry_run(data: list[dict], reward: Reward) -> int:
 
 
 def train(args, data: list[dict], reward: Reward) -> None:
+    import torch
     from datasets import Dataset
     from peft import LoraConfig
     from transformers import BitsAndBytesConfig
     from trl import GRPOConfig, GRPOTrainer
 
+    cuda = torch.cuda.is_available()
+    if args.load_in_4bit and not cuda:
+        raise SystemExit("--load-in-4bit needs a CUDA GPU")
     config = GRPOConfig(
         output_dir=str(args.out),
         max_steps=args.steps,
@@ -120,10 +125,12 @@ def train(args, data: list[dict], reward: Reward) -> None:
         max_completion_length=args.max_completion_length,
         temperature=args.temperature,
         beta=args.beta,
-        bf16=True,
+        bf16=cuda and torch.cuda.is_bf16_supported(),
+        use_cpu=not cuda,  # CPU only for smoke tests with a tiny model
         gradient_checkpointing=True,
         logging_steps=1,
         save_steps=args.save_steps,
+        save_total_limit=2,
         log_completions=True,
         use_vllm=args.vllm,
         vllm_mode="colocate",
@@ -145,13 +152,14 @@ def train(args, data: list[dict], reward: Reward) -> None:
                                task_type="CAUSAL_LM"),
         quantization_config=quant,
     )
-    trainer.train()
+    # Lab sessions end at a fixed time: --resume continues from the last checkpoint in --out.
+    trainer.train(resume_from_checkpoint=args.resume and any(args.out.glob("checkpoint-*")))
     trainer.save_model(str(args.out / "final"))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-7B-Instruct")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
     parser.add_argument("--reward", choices=REWARDS, default="v3", help="the verifier that trains the model")
     parser.add_argument("--tasks", type=Path, nargs="+", default=[ROOT / "tasks"],
                         help="task folders to train on, e.g. tasks tasks_generated")
@@ -162,16 +170,19 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=8, help="samples scored at once")
     parser.add_argument("--steps", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--batch", type=int, default=8)
-    parser.add_argument("--grad-accum", type=int, default=1)
-    parser.add_argument("--num-generations", type=int, default=8)
-    parser.add_argument("--max-completion-length", type=int, default=4096)
+    parser.add_argument("--batch", type=int, default=4, help="completions per forward pass")
+    parser.add_argument("--grad-accum", type=int, default=8,
+                        help="batch x grad-accum completions per step (default 32: 4 tasks x 8 answers)")
+    parser.add_argument("--num-generations", type=int, default=8, help="answers per task, compared with each other")
+    parser.add_argument("--max-completion-length", type=int, default=1536,
+                        help="gold answers are 160-880 tokens with the Qwen2.5 tokenizer")
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--beta", type=float, default=0.0, help="KL penalty")
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--load-in-4bit", action="store_true")
     parser.add_argument("--vllm", action="store_true", help="generate with vLLM in the training process")
-    parser.add_argument("--save-steps", type=int, default=50)
+    parser.add_argument("--save-steps", type=int, default=25)
+    parser.add_argument("--resume", action="store_true", help="continue from the last checkpoint in --out")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--report-to", default="none")
     parser.add_argument("--dry-run", action="store_true", help="score gold and buggy code, no model")

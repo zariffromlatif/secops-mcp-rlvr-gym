@@ -13,4 +13,8 @@ environments/*/*/_vendor/
 environments/*/*/image/requirements.txt
 environments/*/.prime/
 tasks_generated/
+# training runs: keep samples.jsonl, config.json and reports; not weights or TRL's own logs
+results/train/*/checkpoint-*/
+results/train/*/final/
+results/train/*/completions/
 tasks_private/

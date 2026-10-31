@@ -66,6 +66,43 @@ jobs:
       - name: Training reward scores gold as solved and buggy code as not (no model)
         run: uv run python -m train.grpo --dry-run --sandbox local --workers 4 --out .tmp/train-dry
 
+  train-smoke:
+    # The trainer and the evaluator run end to end: a tiny model, on CPU, 2 GRPO steps.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gym
+          POSTGRES_PASSWORD: gym
+          POSTGRES_DB: gym
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gym"
+          --health-interval 2s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+      - run: uv sync --extra mcp
+      - name: Install the training packages (CPU build of PyTorch)
+        run: |
+          uv pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6"
+          uv pip install -r train/requirements.txt
+      - name: Two GRPO steps and an evaluation of the saved adapter
+        run: |
+          MODEL=trl-internal-testing/tiny-Qwen2ForCausalLM-2.5
+          uv run --no-sync python -m train.grpo --model $MODEL --sandbox local --steps 2 --batch 4 \
+            --grad-accum 1 --num-generations 4 --max-completion-length 64 --workers 2 --save-steps 1 --out .tmp/smoke
+          uv run --no-sync python -m train.grpo --model $MODEL --sandbox local --steps 3 --batch 4 \
+            --grad-accum 1 --num-generations 4 --max-completion-length 64 --workers 2 --save-steps 1 --out .tmp/smoke --resume
+          test "$(wc -l < .tmp/smoke/samples.jsonl)" -eq 12
+          uv run --no-sync python -m train.evaluate --model $MODEL --adapter .tmp/smoke/final --sandbox local \
+            --only revenue_double_count_007 -k 2 --max-new-tokens 32 --workers 2 --out .tmp/smoke-eval
+          uv run --no-sync python -m train.report .tmp/smoke
+
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.
     runs-on: ubuntu-latest

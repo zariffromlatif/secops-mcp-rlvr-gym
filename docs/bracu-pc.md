@@ -8,7 +8,7 @@ no such limit, so we can run every task 3+ times on several models, which the pa
 **What it is for**
 1. **Agent evaluations**: open models served locally by Ollama, through the same harness as before.
 2. **The LLM judge (V4)**: gpt-oss-20b runs locally, so re-judging every solution costs nothing.
-3. **Optional, later**: small GRPO fine-tuning runs (QLoRA on a 4-8B model fits in 16 GB).
+3. **GRPO training runs**: the V2-vs-V3 reward comparison on a 1.5-3B model (see "Training runs").
 
 ## Step 0: find these things out first
 
@@ -94,6 +94,53 @@ git add results/
 git commit -m "Local eval results $(date +%F)"
 git push -u origin HEAD
 ```
+
+## Training runs (GRPO)
+
+The experiment and its commands are in [train/README.md](../train/README.md); this is what differs
+on the lab PC.
+
+**Linux only.** On Ubuntu, run as is. On Windows, run everything inside WSL2 Ubuntu: the Windows
+NVIDIA driver makes the GPU visible there (`nvidia-smi` inside WSL must list the 4080), and Docker
+Desktop's WSL integration provides Docker. Clone the repo inside WSL (`~/`), not under `/mnt/c`,
+where file access is slow.
+
+**Free the GPU first.** Ollama keeps its model loaded (`OLLAMA_KEEP_ALIVE=-1`), and gpt-oss-20b holds
+13 of the 16 GB. Stop it before training (`ollama stop local/gpt-oss-20b`, or quit Ollama), and
+check with `nvidia-smi` that almost nothing is in use. Don't run evaluations and training in the
+same session.
+
+**Setup, once:**
+```bash
+uv sync --extra mcp
+uv pip install -r train/requirements.txt          # PyTorch with CUDA from PyPI, TRL, PEFT
+export HF_HOME=~/hf                               # model downloads (1.5B: 3 GB, 3B: 6 GB); keep between sessions
+uv run --no-sync python -m train.grpo --dry-run   # the reward works: gold solved, buggy code not
+```
+
+**A 12-hour window.** Run inside `tmux` so the job survives a dropped connection, and stop it
+before 1 pm. Checkpoints are saved every 25 steps; `--resume` continues the next session from the
+last one, so at most 24 steps are lost:
+```bash
+tmux new -s train
+timeout 11h uv run --no-sync python -m train.grpo --reward v3 --tasks tasks tasks_generated \
+    --steps 200 --out results/train/v3 --resume
+```
+
+A plan for three sessions:
+
+| Session | Work |
+|---|---|
+| 1 | Setup, dry run, held-out tasks, baseline evaluation, 2-step smoke run (note seconds per step and peak memory in `nvidia-smi`), then start the V3 run |
+| 2 | Finish V3 (`--resume`), run V2 |
+| 3 | Finish V2, evaluate both adapters on the held-out tasks, write the report |
+
+Keep the held-out secret (`GYM_FACTORY_SECRET`) in a file outside the repository, on the lab PC
+only if your account there is private; otherwise write it down and set it each session.
+
+**Results back:** push `results/train/` (samples, configs, evaluation summaries, report). Model
+weights (`checkpoint-*`, `final/`) are git-ignored; copy an adapter you want to keep elsewhere.
+`samples.jsonl` holds every answer and grows to roughly 15-20 MB per 200-step run.
 
 ## Safety on a shared PC
 - No Groq or Gemini keys are needed here: the local server needs none (the scripts use a dummy
