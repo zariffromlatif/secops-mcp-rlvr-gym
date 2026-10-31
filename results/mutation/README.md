@@ -7,6 +7,7 @@ in the tests.
 
 | Task | Mutants | Killed | Kill rate | In the fixed lines: killed | Unreviewed survivors |
 |---|---|---|---|---|---|
+| `attachment_path_traversal_015` | 8 | 8 | 100% | 4/4 | 0 |
 | `daily_report_timezone_006` | 10 | 10 | 100% | 5/5 | 0 |
 | `idempotency_keys_011` | 12 | 10 | 83% | 4/4 | 0 |
 | `inventory_reservation_009` | 14 | 14 | 100% | 7/7 | 0 |
@@ -16,11 +17,13 @@ in the tests.
 | `late_fees_014` | 35 | 28 | 80% | 14/14 | 0 |
 | `loyalty_points_expiry_012` | 40 | 40 | 100% | 27/27 | 0 |
 | `orders_pagination_004` | 23 | 22 | 96% | 4/5 | 0 |
+| `profile_mass_assignment_016` | 7 | 7 | 100% | 4/4 | 0 |
 | `report_auth_003` | 2 | 2 | 100% | 0/0 | 0 |
 | `revenue_double_count_007` | 1 | 1 | 100% | 0/0 | 0 |
 | `shipping_quote_013` | 28 | 26 | 93% | 10/12 | 0 |
 | `subscription_proration_008` | 16 | 16 | 100% | 4/4 | 0 |
 | `tiered_pricing_010` | 18 | 15 | 83% | 9/12 | 0 |
+| `webhook_signature_017` | 17 | 15 | 88% | 8/10 | 0 |
 
 ## Survivors
 
@@ -39,3 +42,5 @@ in the tests.
 - `tiered_pricing_010 L34 > -> >=` (comparison): a tier is only visited with units > 0, because the loop stops at the last tier used
 - `tiered_pricing_010 L34 0 -> -1` (constant): a tier is only visited with units > 0, because the loop stops at the last tier used
 - `tiered_pricing_010 L38 <= -> <` (comparison): on an exact bound the next tier gets 0 units, which `if units > 0` skips
+- `webhook_signature_017 L25 300 -> 299` (constant): a 1-second change to the tolerance needs a controllable clock to test; request latency makes it flaky
+- `webhook_signature_017 L51 > -> >=` (comparison): differs only at exactly 300.000 s, which needs a controllable clock to test

@@ -39,6 +39,17 @@ def _sum(counts: list[tuple[int, int]]) -> tuple[int, int]:
     return (sum(c[0] for c in counts), sum(c[1] for c in counts))
 
 
+def write_app(work: Path, app_files: dict[str, str]) -> None:
+    """Replace the Python files of work/app with the solution's. Solutions record only Python files,
+    so the task's other app files (e.g. stored attachments) are kept as the task ships them."""
+    for path in (work / "app").rglob("*.py"):
+        path.unlink()
+    for rel, source in app_files.items():
+        path = work / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+
+
 def rescore_patch(task_id: str, app_files: dict[str, str], tests_modified=(), sandbox: str = "docker") -> dict:
     task_dir = TASKS / task_id
     spec = yaml.safe_load((task_dir / "task.yaml").read_text(encoding="utf-8"))["scoring"]
@@ -51,11 +62,7 @@ def rescore_patch(task_id: str, app_files: dict[str, str], tests_modified=(), sa
     with tempfile.TemporaryDirectory(prefix="audit-", dir=sp.TMP_ROOT) as tmp:
         work = Path(tmp)
         sp.prepare_workdir(task_dir, work)
-        shutil.rmtree(work / "app")
-        for rel, source in app_files.items():
-            path = work / rel
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(source, encoding="utf-8")
+        write_app(work, app_files)
         shutil.copytree(task_dir / "hidden", work / "hidden")
 
         if sandbox == "docker":

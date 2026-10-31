@@ -173,6 +173,7 @@ def worker_databases(n: int) -> list[str]:
 
 
 def mutate_task(task_dir: Path, db_urls: list[str], limit: int) -> dict:
+    task_dir = task_dir.resolve()
     spec = yaml.safe_load((task_dir / "task.yaml").read_text())["scoring"]
     targets = spec["regression"] + (spec.get("security") or spec["target"])
     TMP_ROOT.mkdir(exist_ok=True)

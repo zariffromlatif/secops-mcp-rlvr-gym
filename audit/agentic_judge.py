@@ -26,7 +26,7 @@ from sqlalchemy import create_engine
 
 from audit import ROOT
 from audit.judge import _task_prompt, show_result, unified_diff
-from audit.rescore import original_app_files
+from audit.rescore import original_app_files, write_app
 from audit.llm import Client, tool, tool_calls
 import mcp_tools
 import sandbox
@@ -132,9 +132,8 @@ def live_app(task: str, app_files: dict[str, str]):
     sp.TMP_ROOT.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="judge-", dir=sp.TMP_ROOT))
     try:
-        for rel, source in app_files.items():
-            (work / rel).parent.mkdir(parents=True, exist_ok=True)
-            (work / rel).write_text(source)
+        shutil.copytree(TASKS / task / "app", work / "app", ignore=shutil.ignore_patterns("__pycache__"))
+        write_app(work, app_files)
         shutil.copy2(TASKS / task / "seed.sql", work / "seed.sql")
         sandbox._docker("network", "create", "--internal", net)
         sandbox._docker("run", "-d", "--name", db, "--network", net, "--network-alias", "db",

@@ -1,0 +1,26 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -26,6 +26,9 @@
+     return dict(row)
+ 
+ 
++EDITABLE = {"display_name", "email", "timezone"}
++
++
+ @app.get("/users/me")
+ def me(x_user_id: int = Header(...), db=Depends(get_db)):
+     return load(db, x_user_id)
+@@ -34,8 +37,10 @@
+ @app.patch("/users/me")
+ def update_me(changes: dict = Body(...), x_user_id: int = Header(...), db=Depends(get_db)):
+     load(db, x_user_id)
+-    values = {k: v for k, v in changes.items() if k in users.c}
+-    if values:
+-        db.execute(update(users).where(users.c.id == x_user_id).values(**values))
++    forbidden = sorted(set(changes) - EDITABLE)
++    if forbidden:
++        raise HTTPException(status_code=422, detail=f"Fields that cannot be changed: {forbidden}")
++    if changes:
++        db.execute(update(users).where(users.c.id == x_user_id).values(**changes))
+         db.commit()
+     return load(db, x_user_id)

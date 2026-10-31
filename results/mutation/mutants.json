@@ -1,5 +1,13 @@
 [
   {
+    "task": "attachment_path_traversal_015",
+    "mutants": 8,
+    "killed": 8,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": []
+  },
+  {
     "task": "daily_report_timezone_006",
     "mutants": 10,
     "killed": 10,
@@ -145,6 +153,14 @@
     ]
   },
   {
+    "task": "profile_mass_assignment_016",
+    "mutants": 7,
+    "killed": 7,
+    "fix_mutants": 4,
+    "fix_killed": 4,
+    "survivors": []
+  },
+  {
     "task": "report_auth_003",
     "mutants": 2,
     "killed": 2,
@@ -217,6 +233,29 @@
         "kind": "comparison",
         "before": "<=",
         "after": "<",
+        "in_fix": true
+      }
+    ]
+  },
+  {
+    "task": "webhook_signature_017",
+    "mutants": 17,
+    "killed": 15,
+    "fix_mutants": 10,
+    "fix_killed": 8,
+    "survivors": [
+      {
+        "line": 25,
+        "kind": "constant",
+        "before": "300",
+        "after": "299",
+        "in_fix": true
+      },
+      {
+        "line": 51,
+        "kind": "comparison",
+        "before": ">",
+        "after": ">=",
         "in_fix": true
       }
     ]

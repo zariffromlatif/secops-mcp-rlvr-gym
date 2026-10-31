@@ -14,3 +14,5 @@ shipping_quote_013 L47 1 -> 0: weights are > 0, so there is always at least one 
 tiered_pricing_010 L34 > -> >=: a tier is only visited with units > 0, because the loop stops at the last tier used
 tiered_pricing_010 L34 0 -> -1: a tier is only visited with units > 0, because the loop stops at the last tier used
 tiered_pricing_010 L38 <= -> <: on an exact bound the next tier gets 0 units, which `if units > 0` skips
+webhook_signature_017 L25 300 -> 299: a 1-second change to the tolerance needs a controllable clock to test; request latency makes it flaky
+webhook_signature_017 L51 > -> >=: differs only at exactly 300.000 s, which needs a controllable clock to test

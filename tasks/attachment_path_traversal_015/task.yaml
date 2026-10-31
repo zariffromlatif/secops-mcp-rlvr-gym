@@ -1,0 +1,24 @@
+id: attachment_path_traversal_015
+category: path-traversal
+cwe: CWE-22
+difficulty: easy
+editable_paths:
+  - app/
+prompt: |
+  You are working on a small FastAPI service that stores invoice attachments for several tenants.
+  The API gateway authenticates each caller and forwards their tenant in the X-Tenant-ID header.
+  Files live in app/storage/<tenant id>/, some of them in subfolders.
+
+  Security review finding (high): GET /attachments/content builds the file path by joining the
+  `name` query parameter to the tenant's folder. A name such as ../2/contract.txt reads another
+  tenant's file, and other names can read any file the service can access.
+
+  Fix the endpoint so that:
+  - a tenant can only read files inside its own folder, including its subfolders
+  - any name that would read a file outside that folder returns 404, exactly like a missing file
+  - existing behaviour (the listing, reading files in subfolders, the response shape) is unchanged
+
+  You may run the tests in tests_public/. Do not modify test files.
+scoring:
+  regression: [tests_public, hidden/test_regression_hidden.py]
+  security: [hidden/test_security.py]
