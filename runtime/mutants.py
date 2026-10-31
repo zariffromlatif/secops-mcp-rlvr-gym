@@ -162,9 +162,9 @@ def run_tests(workdir: Path, targets: list[str], db_url: str) -> bool:
     return True
 
 
-def worker_databases(n: int) -> list[str]:
+def worker_databases(n: int, prefix: str = "gym_mutants") -> list[str]:
     engine = create_engine(ADMIN_URL, isolation_level="AUTOCOMMIT")
-    names = [f"gym_mutants_{i}" for i in range(n)]
+    names = [f"{prefix}_{i}" for i in range(n)]
     with engine.connect() as conn:
         for name in names:
             conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')

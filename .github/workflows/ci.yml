@@ -59,6 +59,8 @@ jobs:
           uv run python -m factory.generate --count 2 --seed 1 --out .tmp/factory
           uv run python runtime/validate_tasks.py --tasks-dir .tmp/factory
           uv run python runtime/mutants.py --tasks-dir .tmp/factory --workers 4 --check
+      - name: Training reward scores gold as solved and buggy code as not (no model)
+        run: uv run python -m train.grpo --dry-run --workers 4 --out .tmp/train-dry
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.

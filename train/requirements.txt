@@ -1,0 +1,9 @@
+# Training only (python -m train.grpo without --dry-run). Needs a CUDA GPU; not part of the main lockfile.
+trl>=1.17,<2
+peft>=0.17
+transformers>=4.56.2
+datasets>=4.7
+accelerate>=1.11
+torch>=2.6
+bitsandbytes>=0.45.2  # --load-in-4bit
+# vllm>=0.22,<0.33    # --vllm
