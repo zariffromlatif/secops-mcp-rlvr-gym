@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import functools
 import importlib.util
 import json
 import os
@@ -153,6 +154,42 @@ def load_checks(wf_dir: Path):
     return module
 
 
+COMPANY_TABLES = ("customers", "payments", "ledger_credits", "tickets", "messages")
+
+
+def snapshot(db_name: str) -> dict[str, dict]:
+    """Every row of the company tables, by table and primary key."""
+    engine = create_engine(make_url(ADMIN_URL).set(database=db_name))
+    try:
+        with engine.connect() as conn:
+            return {t: {row[0]: tuple(row) for row in conn.exec_driver_sql(f"SELECT * FROM {t}")}
+                    for t in COMPANY_TABLES}
+    finally:
+        engine.dispose()
+
+
+def changed_rows(before: dict, after: dict) -> set[tuple[str, object]]:
+    """Pre-existing rows that `after` changed or removed."""
+    return {(t, pk) for t, rows in before.items() for pk, row in rows.items() if after[t].get(pk) != row}
+
+
+@functools.lru_cache(maxsize=None)
+def reference_change(wf_dir: Path) -> tuple[dict, frozenset]:
+    """The seed state, and the pre-existing rows the gold trajectory changes."""
+    tools, max_steps = limits(wf_dir)
+    with episode(wf_dir) as name:
+        initial = snapshot(name)
+        replay(name, json.loads((wf_dir / "gold.json").read_text()), max_steps, tools)
+        return initial, frozenset(changed_rows(initial, snapshot(name)))
+
+
+def unexpected_changes(wf_dir: Path, db_name: str) -> set[tuple[str, object]]:
+    """Pre-existing rows this episode changed that a correct run leaves alone: collateral damage
+    that no hand-written guard has to anticipate."""
+    initial, expected = reference_change(wf_dir.resolve())
+    return changed_rows(initial, snapshot(db_name)) - expected
+
+
 def check_state(wf_dir: Path, db_name: str) -> WorkflowScore:
     checks = load_checks(wf_dir)
     engine = create_engine(make_url(ADMIN_URL).set(database=db_name))
@@ -164,6 +201,7 @@ def check_state(wf_dir: Path, db_name: str) -> WorkflowScore:
             )
     finally:
         engine.dispose()
+    score.guard["no_unexpected_changes"] = not unexpected_changes(wf_dir, db_name)
     return score
 
 

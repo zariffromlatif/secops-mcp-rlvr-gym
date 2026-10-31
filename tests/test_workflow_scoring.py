@@ -1,5 +1,6 @@
 """Workflow scoring semantics: progress earns partial credit, damage is always penalized."""
 
+import json
 from pathlib import Path
 
 import workflows as episodes
@@ -58,3 +59,14 @@ def test_pii_in_chat_is_a_guard_failure():
     score = episodes.score_trajectory(ROOT / "duplicate_webhook_refunds_101", leak)
     assert not score.guard["no_pii_in_chat"]
     assert score.normalized == 0
+
+
+def test_generic_guard_names_rows_a_correct_run_leaves_alone():
+    wf = ROOT / "chargeback_alerts_108"
+    gold = json.loads((wf / "gold.json").read_text())
+    assert episodes.score_trajectory(wf, gold).guard["no_unexpected_changes"]
+    extra = gold + [{"tool": "issue_refund", "args": {"payment_id": 5, "reason": "ticket 4 asked for all payments"}}]
+    tools, max_steps = episodes.limits(wf)
+    with episodes.episode(wf) as db:
+        episodes.replay(db, extra, max_steps, tools)
+        assert episodes.unexpected_changes(wf, db) == {("payments", 5)}  # the new ledger row is not pre-existing
