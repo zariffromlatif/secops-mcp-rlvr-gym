@@ -29,7 +29,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sandbox import parse_junit, run_episode  # noqa: E402
+from sandbox import SANDBOXES, parse_junit, run_episode  # noqa: E402
 from verifier.gates import RewardBreakdown, score  # noqa: E402
 
 AGENT_VISIBLE = ["app", "tests_public", "seed.sql"]
@@ -112,9 +112,9 @@ def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBr
 
         shutil.copytree(task_dir / "hidden", workdir / "hidden")
         app_paths = [p.relative_to(workdir) for p in (workdir / "app").rglob("*.py")]
-        if sandbox == "docker":
+        if sandbox in ("docker", "warm"):
             n = len(spec["regression"])
-            counts = run_episode(workdir, spec["regression"] + spec["security"])
+            counts = run_episode(workdir, spec["regression"] + spec["security"], warm=sandbox == "warm")
             regression = tuple(map(sum, zip(*counts[:n])))
             security = tuple(map(sum, zip(*counts[n:])))
         else:
@@ -134,7 +134,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("task_dir", type=Path)
     parser.add_argument("patch", type=Path)
-    parser.add_argument("--sandbox", choices=["local", "docker"], default="local")
+    parser.add_argument("--sandbox", choices=SANDBOXES, default="local")
     args = parser.parse_args()
     r = score_patch(args.task_dir, args.patch, args.sandbox)
     print(json.dumps({**asdict(r), "total": r.total, "normalized": round(r.normalized, 3)}, indent=2))

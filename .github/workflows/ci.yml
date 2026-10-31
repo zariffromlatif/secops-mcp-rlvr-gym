@@ -26,6 +26,10 @@ jobs:
         run: uv run pytest -q verifier tests/test_summarize_evals.py tests/test_audit_pipeline.py tests/test_score_patch.py tests/test_mutants.py tests/test_factory.py tests/test_canary.py tests/test_contamination.py
       - name: Patch tasks score as expected in the Docker sandbox (gold and noop 3 runs each; no exploit solved)
         run: uv run python runtime/validate_tasks.py --sandbox docker --repeat 3
+      - name: Warm sandbox scores like the cold one and keeps episodes apart
+        run: |
+          uv run pytest -q tests/test_warm_sandbox.py
+          uv run python runtime/validate_tasks.py --sandbox warm
       - name: MCP workflows score as expected (gold solved, noop and bad trajectories not)
         run: uv run python runtime/workflows.py validate
       - name: MCP server lists all tools
@@ -60,7 +64,7 @@ jobs:
           uv run python runtime/validate_tasks.py --tasks-dir .tmp/factory
           uv run python runtime/mutants.py --tasks-dir .tmp/factory --workers 4 --check
       - name: Training reward scores gold as solved and buggy code as not (no model)
-        run: uv run python -m train.grpo --dry-run --workers 4 --out .tmp/train-dry
+        run: uv run python -m train.grpo --dry-run --sandbox local --workers 4 --out .tmp/train-dry
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.
@@ -85,10 +89,10 @@ jobs:
       - run: uv sync --extra mcp --extra envs
       - run: uv run python scripts/sync_envs.py
       - name: Tool safety, workflow scoring and toolset tests
-        run: uv run pytest -q tests
+        run: uv run pytest -q tests --ignore=tests/test_warm_sandbox.py  # runs in the validate job
       - name: Build task image
         run: sh scripts/build_task_image.sh
-      - name: In-box scorer resists report rewriting and port squatting
+      - name: In-box scorer resists report rewriting, port squatting and symlinked hidden tests
         run: uv run python scripts/check_box_exploits.py
       - name: vf-validate secops_gym_patches (gold + noop, Docker runtime)
         run: |

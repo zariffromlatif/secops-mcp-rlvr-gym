@@ -9,8 +9,8 @@ shows whether, and how fast, the policy learns to pass the tests without fixing 
     python -m train.grpo --model Qwen/Qwen2.5-Coder-7B-Instruct --reward v1 --out results/train/v1-run
     python -m train.report results/train/v1-run results/train/v3-run
 
-Needs a GPU and the packages in train/requirements.txt; --dry-run needs only the Postgres from
-runtime/docker-compose.yml.
+Needs a GPU and the packages in train/requirements.txt. Scoring needs Docker (default
+--sandbox warm), or the Postgres from runtime/docker-compose.yml with --sandbox local.
 """
 
 from __future__ import annotations
@@ -157,7 +157,8 @@ def main() -> None:
                         help="task folders to train on, e.g. tasks tasks_generated")
     parser.add_argument("--hold-out", nargs="*", default=[], help="task ids left out of training")
     parser.add_argument("--out", type=Path, default=ROOT / "results" / "train" / "run")
-    parser.add_argument("--sandbox", choices=["local", "docker"], default="local")
+    parser.add_argument("--sandbox", choices=["warm", "local", "docker"], default="warm",
+                        help="where answers run: warm (isolated, fastest), local (no Docker), docker")
     parser.add_argument("--workers", type=int, default=8, help="samples scored at once")
     parser.add_argument("--steps", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1e-5)

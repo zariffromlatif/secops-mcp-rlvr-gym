@@ -9,7 +9,7 @@ Expected layout (one subfolder per task id):
       report_auth_003/
         sample_000.patch
 
-    uv run python runtime/score_batch.py patches/ results.csv --workers 4
+    uv run python runtime/score_batch.py patches/ results.csv --workers 4 [--sandbox warm]
 """
 
 from __future__ import annotations
@@ -30,6 +30,8 @@ def main() -> None:
     parser.add_argument("patches", type=Path)
     parser.add_argument("out", type=Path)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--sandbox", choices=["docker", "warm"], default="docker",
+                        help="warm: reuse each worker's network, Postgres and test runner")
     args = parser.parse_args()
 
     jobs = [
@@ -45,7 +47,7 @@ def main() -> None:
 
     def run(job):
         task_dir, patch = job
-        r = score_patch(task_dir, patch, "docker")
+        r = score_patch(task_dir, patch, args.sandbox)
         print(f"{task_dir.name}/{patch.name}: {r.normalized:.2f}{' solved' if r.solved else ''}")
         return {
             "task": task_dir.name, "patch": patch.name, "solved": r.solved,

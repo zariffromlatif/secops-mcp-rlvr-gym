@@ -58,7 +58,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("solutions", type=Path)
     parser.add_argument("--out", type=Path, default=Path("results/audit/verdicts.csv"))
-    parser.add_argument("--sandbox", choices=["docker", "local"], default="docker")
+    parser.add_argument("--sandbox", choices=["docker", "warm", "local"], default="docker")
     parser.add_argument("--judge-model")
     parser.add_argument("--judge-base-url", default="https://api.groq.com/openai/v1")
     parser.add_argument("--judge-key-var", default="GROQ_API_KEY")

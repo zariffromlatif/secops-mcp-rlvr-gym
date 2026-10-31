@@ -17,12 +17,13 @@ import argparse
 import sys
 from pathlib import Path
 
+from sandbox import SANDBOXES
 from score_patch import ROOT, score_patch
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sandbox", choices=["local", "docker"], default="local")
+    parser.add_argument("--sandbox", choices=SANDBOXES, default="local")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--only", nargs="*", help="task ids to check (default: all)")
     parser.add_argument("--tasks-dir", type=Path, default=ROOT / "tasks")

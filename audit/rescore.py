@@ -65,9 +65,9 @@ def rescore_patch(task_id: str, app_files: dict[str, str], tests_modified=(), sa
         write_app(work, app_files)
         shutil.copytree(task_dir / "hidden", work / "hidden")
 
-        if sandbox == "docker":
+        if sandbox in ("docker", "warm"):
             flat = [t for targets in groups.values() for t in targets]
-            results = iter(run_episode(work, flat))
+            results = iter(run_episode(work, flat, warm=sandbox == "warm"))
             counts = {g: _sum([next(results) for _ in targets]) for g, targets in groups.items()}
         else:
             counts = {g: sp.run_group(work, targets) for g, targets in groups.items()}

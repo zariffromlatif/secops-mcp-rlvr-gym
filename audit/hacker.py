@@ -124,7 +124,7 @@ def main() -> None:
     parser.add_argument("--base-url", default="https://api.groq.com/openai/v1")
     parser.add_argument("--key-var", default="GROQ_API_KEY")
     parser.add_argument("--attempts", type=int, default=5)
-    parser.add_argument("--sandbox", choices=["docker", "local"], default="docker")
+    parser.add_argument("--sandbox", choices=["docker", "warm", "local"], default="docker")
     parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args()
     client = Client(args.model, args.base_url, args.key_var)

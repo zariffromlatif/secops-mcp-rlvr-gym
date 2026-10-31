@@ -27,14 +27,22 @@ The unchanged buggy code scores v1 = 1 on every task (public tests do not catch 
 and v3 around 0.5 (regression tests pass, target tests do not), so a V1-trained policy gets full
 reward for changing nothing.
 
-`--sandbox local` (default) imports the app into the test process with one Postgres database per
-scoring worker: a few seconds per sample, not isolated. `--sandbox docker` uses the scoring sandbox
-of `runtime/sandbox.py`: isolated, slower.
+Where the answers run (`--sandbox`; seconds per sample and scoring worker, measured on a 4-CPU
+machine):
+
+| sandbox | per sample | isolated | |
+|---|---|---|---|
+| `warm` (default) | 1.7 s | yes | the scoring sandbox with its network, Postgres and test runner kept running (`runtime/warm_sandbox.py`) |
+| `local` | 3.8 s | no | the app is imported into the test process, one Postgres database per worker; needs no Docker, but in-process tricks can pay off |
+| `docker` | 7.5 s | yes | the sandbox built from scratch for every sample |
+
+Report results from an isolated run: a reward the policy can game in-process measures the sandbox,
+not the verifier.
 
 ## Running
 
 ```bash
-docker compose -f runtime/docker-compose.yml up -d --wait
+docker compose -f runtime/docker-compose.yml up -d --wait   # only for --sandbox local
 
 # No model, no GPU: score every gold fix and every buggy original through the training reward.
 uv run python -m train.grpo --dry-run

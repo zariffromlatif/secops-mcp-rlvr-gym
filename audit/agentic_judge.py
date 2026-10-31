@@ -136,21 +136,16 @@ def live_app(task: str, app_files: dict[str, str]):
         write_app(work, app_files)
         shutil.copy2(TASKS / task / "seed.sql", work / "seed.sql")
         sandbox._docker("network", "create", "--internal", net)
-        sandbox._docker("run", "-d", "--name", db, "--network", net, "--network-alias", "db",
-                        "--tmpfs", "/var/lib/postgresql/data", "-e", "POSTGRES_USER=gym",
-                        "-e", "POSTGRES_PASSWORD=gym", "-e", "POSTGRES_DB=gym", sandbox.DB_IMAGE)
-        sandbox._wait_for_db(db)
-        sandbox._docker("exec", db, "psql", "-U", "gym", "-d", "gym", "-q", "-v", "ON_ERROR_STOP=1",
-                        "-c", sandbox.APP_ROLE_SQL)
+        owner_url, app_url = sandbox.start_db(net, db)
         sandbox._docker("run", "-d", "--name", probe, "--network", net, *sandbox.LOCKDOWN,
                         *sandbox._bind(work / "seed.sql", "/work/seed.sql"),
-                        "-e", f"DATABASE_URL={sandbox.DB_URL}", "-e", "APP_URL=http://app:8000",
+                        "-e", f"DATABASE_URL={owner_url}", "-e", "APP_URL=http://app:8000",
                         image, "sleep", "infinity")
         live = LiveApp(probe)
         live.reset_data()  # tables exist before the app starts, as in scoring
         sandbox._docker("run", "-d", "--name", app, "--network", net, "--network-alias", "app",
                         *sandbox.LOCKDOWN, *sandbox._bind(work / "app", "/work/app"),
-                        "-e", f"DATABASE_URL={sandbox.APP_DB_URL}",
+                        "-e", f"DATABASE_URL={app_url}",
                         image, "python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000")
         yield live
     finally:

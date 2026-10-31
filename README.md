@@ -251,7 +251,8 @@ the agent saw.
 
 - **Exploits.** `tasks/*/exploits/` holds 4-5 attacks per task (73 in all); `validate_tasks.py`
   fails if any is solved, or if one no longer applies. `scripts/check_box_exploits.py` attacks the
-  in-box scorer of the Prime environment itself (rewriting test reports, squatting the app's port).
+  in-box scorer of the Prime environment itself (rewriting test reports, squatting the app's port,
+  a symlink from `app/` to the hidden tests).
 - **Mutation testing.** `runtime/mutants.py` makes small wrong variants of every gold fix (flipped
   comparisons, changed constants, dropped SQL conditions) and runs the tests on each. A variant no
   test catches is either a missing test or reviewed as equivalent in `results/mutation/equivalent.yaml`;
@@ -296,7 +297,8 @@ factory can build private held-out splits from a secret seed. See
 - an internal Docker network with **no internet access**
 - a fresh Postgres per episode (data on tmpfs)
 - the patched app in its own container: read-only filesystem, non-root, all capabilities dropped,
-  memory / CPU / process limits, and a database role that can only read and write rows
+  memory / CPU / process limits, and a database role that can only read and write rows (the owner
+  account the tests use has a random password per episode, so the app can't log in as it)
 - tests in a separate container that reaches the app over HTTP, so the agent's code never runs
   inside the test process and cannot tamper with results
 - hidden tests mounted read-only, only at scoring time
@@ -305,9 +307,29 @@ factory can build private held-out splits from a secret seed. See
 The sandbox image (~290 MB) builds automatically on first use and is rebuilt when
 `runtime/Dockerfile.sandbox` or `runtime/requirements-sandbox.txt` changes.
 
+### Warm mode
+
+`--sandbox warm` gives the same isolation about four times faster (1.8 s instead of 7.5 s per
+patch here) by keeping the slow parts running between episodes
+([runtime/warm_sandbox.py](runtime/warm_sandbox.py)):
+
+- the network and Postgres stay up; every episode gets its own database and row-only role with
+  random passwords, no other role may connect to it, and both are dropped afterwards
+- the test runner stays up with the test libraries imported, and forks a fresh process per test run
+- the agent's code still gets a **new container every episode**. It is started one episode ahead
+  with the web stack already imported, gets the code at scoring time, and is removed before the
+  next episode's code goes in, so two agents' code never run side by side
+- a pool is rebuilt after 200 episodes, a timeout or an error; parallel workers get separate pools
+
+`tests/test_warm_sandbox.py` runs an app that tries to log in as the owner, reach other databases,
+create tables, reach the internet, read the tests and leave traces for the next episode, and
+checks that warm and cold scores are identical. Use `docker` as the reference and `warm` for bulk
+scoring and training: `score_batch.py --sandbox warm`, `validate_tasks.py --sandbox warm`,
+`audit.verify --sandbox warm`, `train.grpo --sandbox warm`.
+
 ### Local mode
 
-Without `--sandbox docker`, tests import the app in-process against a Postgres on port 5433
+With `--sandbox local`, tests import the app in-process against a Postgres on port 5433
 (`docker compose -f runtime/docker-compose.yml up -d`). It is faster for writing tasks but not
 isolated. Set `DATABASE_URL` to use a different Postgres.
 

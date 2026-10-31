@@ -5,10 +5,12 @@ One run of the tests gives all three rewards:
     v2  share of public + hidden tests passing
     v3  the multi-gate reward (format, regression, target, static), normalized to 0-1
 
-    local   the app is imported into the test process, one Postgres database per worker:
-            seconds per sample, but not isolated (in-process tricks can work, which is part of
-            what a V1-vs-V3 training run measures)
-    docker  the scoring sandbox: isolated, slower
+Where the answer runs:
+    warm    the scoring sandbox with its network, Postgres and test runner reused across samples
+            (runtime/warm_sandbox.py): isolated, and the fastest
+    local   the app is imported into the test process, one Postgres database per worker: needs no
+            Docker, but is not isolated, so in-process tricks can pay off
+    docker  the scoring sandbox built from scratch for every sample: isolated, slowest
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ def extract_main(completion: str) -> str | None:
 
 
 class Scorer:
-    def __init__(self, sandbox: str = "local", workers: int = 4):
+    def __init__(self, sandbox: str = "warm", workers: int = 4):
         self.sandbox = sandbox
         self.free: queue.Queue = queue.Queue()
         if sandbox == "local":
@@ -87,8 +89,8 @@ class Scorer:
             (work / "app" / "main.py").write_text(main_py)
             shutil.copytree(task_dir / "hidden", work / "hidden")
             targets = ["tests_public", *hidden_regression, *target]
-            if self.sandbox == "docker":
-                counts = run_episode(work, targets)
+            if self.sandbox in ("docker", "warm"):
+                counts = run_episode(work, targets, warm=self.sandbox == "warm")
             else:
                 db_url = self.free.get()
                 try:
