@@ -29,7 +29,7 @@ def refunded_tickets_closed(conn):
     for t, payment in REFUNDS.items():
         status, resolution = ticket(conn, t)
         resolution = (resolution or "").lower()
-        if status != "closed" or not resolution.startswith("refunded") or not re.search(rf"\b{payment}\b", resolution):
+        if status != "closed" or not resolution.startswith("refunded") or set(re.findall(r"\d+", resolution)) != {str(payment)}:
             return False
     return True
 
@@ -41,15 +41,21 @@ def denied_and_duplicate_tickets_closed(conn):
             return False
     for t, kept in DUPLICATE.items():
         status, resolution = ticket(conn, t)
-        if status != "closed" or "duplicate" not in (resolution or "").lower() or f"#{kept}" not in (resolution or ""):
+        if status != "closed" or "duplicate" not in (resolution or "").lower() or set(re.findall(r"#(\d+)", resolution or "")) != {str(kept)}:
             return False
     return True
 
+def stated(message: str, label: str) -> list[int]:
+    """Every count written as '<n> <label>': a hedged '3 refunded, 4 refunded' gives [3, 4], which fails."""
+    return [int(n) for n in re.findall(rf"\b(\d+)\s+{label}\b", message.lower())]
+
 
 def summary_posted(conn):
-    messages = [r[0].lower() for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#risk'"))]
+    messages = [r[0] for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#risk'"))]
     return any(
-        re.search(r"\b4\s+refunded", m) and re.search(r"\b2\s+denied", m) and re.search(r"\b1\s+duplicate", m)
+        stated(m, "refunded") == [4]
+        and stated(m, "denied") == [2]
+        and stated(m, "duplicate") == [1]
         for m in messages
     )
 

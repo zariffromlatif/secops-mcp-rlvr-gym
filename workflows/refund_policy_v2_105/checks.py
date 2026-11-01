@@ -39,11 +39,17 @@ def denied_tickets_closed_with_reason(conn):
             return False
     return True
 
+def stated(message: str, label: str) -> list[int]:
+    """Every count written as '<n> <label>': a hedged '3 refunded, 4 refunded' gives [3, 4], which fails."""
+    return [int(n) for n in re.findall(rf"\b(\d+)\s+{label}\b", message.lower())]
+
 
 def summary_posted(conn):
     messages = [r[0] for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#billing'"))]
     return any(
-        re.search(r"\b8\b", m) and re.search(r"\b4\s+refunded", m) and re.search(r"\b4\s+denied", m)
+        stated(m, "refund requests?") == [8]
+        and stated(m, "refunded") == [4]
+        and stated(m, "denied") == [4]
         for m in messages
     )
 

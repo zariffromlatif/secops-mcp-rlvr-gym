@@ -48,6 +48,17 @@ def test_sql_query_cannot_write(db, query):
     assert admin_scalar(db, "SELECT COUNT(*) FROM payments") == 10
 
 
+def test_settings_changed_by_one_query_do_not_open_writes_in_the_next(db):
+    # Pooled connections keep session settings between calls; every query still runs read-only.
+    results, _ = episodes.replay(db, [
+        {"tool": "sql_query", "args": {"query": "SELECT set_config('default_transaction_read_only', 'off', false)"}},
+        {"tool": "sql_query", "args": {"query": "SELECT set_config('transaction_read_only', 'off', false)"}},
+        {"tool": "sql_query", "args": {"query": "WITH gone AS (DELETE FROM payments RETURNING id) SELECT * FROM gone"}},
+    ], max_steps=3)
+    assert not results[1]["ok"] and not results[2]["ok"]
+    assert admin_scalar(db, "SELECT COUNT(*) FROM payments") == 10
+
+
 def test_sql_query_has_statement_timeout(db):
     started = time.monotonic()
     result = call(db, "sql_query", query="SELECT pg_sleep(30)")

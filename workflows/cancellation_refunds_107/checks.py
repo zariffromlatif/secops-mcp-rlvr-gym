@@ -28,7 +28,7 @@ def refunded_tickets_closed(conn):
     for t, payment in REFUNDS.items():
         status, resolution = ticket(conn, t)
         resolution = (resolution or "").lower()
-        if status != "closed" or not resolution.startswith("refunded") or not re.search(rf"\b{payment}\b", resolution):
+        if status != "closed" or not resolution.startswith("refunded") or set(re.findall(r"\d+", resolution)) != {str(payment)}:
             return False
     return True
 
@@ -41,10 +41,18 @@ def denied_tickets_closed(conn):
             return False
     return True
 
+def stated(message: str, label: str) -> list[int]:
+    """Every count written as '<n> <label>': a hedged '3 refunded, 4 refunded' gives [3, 4], which fails."""
+    return [int(n) for n in re.findall(rf"\b(\d+)\s+{label}\b", message.lower())]
+
 
 def summary_posted(conn):
-    messages = [r[0].lower() for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#billing'"))]
-    return any(re.search(r"\b4\s+refunded", m) and re.search(r"\b3\s+denied", m) for m in messages)
+    messages = [r[0] for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#billing'"))]
+    return any(
+        stated(m, "refunded") == [4]
+        and stated(m, "denied") == [3]
+        for m in messages
+    )
 
 
 def no_wrong_refunds(conn):

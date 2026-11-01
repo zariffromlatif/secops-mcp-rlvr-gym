@@ -193,9 +193,15 @@ lists: `sql_query` (read-only), `issue_refund`, `create_ticket`, `close_ticket`,
   other tickets touched). Each failure costs 0.5. Guards must only detect *damage*: an agent
   that is halfway through must not fail a guard. This was a real bug fixed while building task
   103.
-- **One generic guard** applies to every workflow: `no_unexpected_changes` replays `gold.json`,
+- **Two generic guards** apply to every workflow. `no_unexpected_changes` replays `gold.json`,
   notes which existing rows a correct run changes, and fails an episode that changed or deleted any
   other existing row. Hand-written guards catch the damage you thought of; this one catches the rest.
+  `no_contact_details_in_chat` fails if a customer's phone number or email shows up in chat,
+  also spaced out or spelled ("+880 1711 000001", "rahim.uddin at example dot com").
+- **Checks read what was stated, all of it.** A summary that lists several counts ("3 refunded,
+  4 refunded, 5 refunded") or a note that names several payments fails, even if one of them is
+  right: otherwise hedging would be rewarded. See [attacks.md](attacks.md) for every attack found
+  on the scorers.
 
 **Why traps matter:** each workflow contains cases that look right but aren't. In 101, a customer
 bought the same item twice under *different* webhook ids, which is a real purchase and must not be

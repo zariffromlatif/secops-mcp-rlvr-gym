@@ -49,13 +49,17 @@ def amount_mismatch_tickets(conn):
 def credit_without_refund_tickets(conn):
     return has_tickets(conn, "Ledger: credit without refund")
 
+def stated(message: str, label: str) -> list[int]:
+    """Every count written as '<n> <label>': a hedged '3 refunded, 4 refunded' gives [3, 4], which fails."""
+    return [int(n) for n in re.findall(rf"\b(\d+)\s+{label}\b", message.lower())]
+
 
 def summary_posted(conn):
-    messages = [r[0].lower() for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#finance'"))]
+    messages = [r[0] for r in conn.execute(text("SELECT text FROM messages WHERE channel = '#finance'"))]
     return any(
-        re.search(r"\b3\s+missing credit", m)
-        and re.search(r"\b2\s+amount mismatch", m)
-        and re.search(r"\b2\s+credit without refund", m)
+        stated(m, "missing credit") == [3]
+        and stated(m, "amount mismatch") == [2]
+        and stated(m, "credit without refund") == [2]
         for m in messages
     )
 

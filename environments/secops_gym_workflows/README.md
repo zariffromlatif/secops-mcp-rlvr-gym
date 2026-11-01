@@ -21,7 +21,10 @@ chat loop, with no shell, so every change goes through a validated tool call.
 
 **Reward**: the fraction of hidden GOAL checks passed, minus 0.5 for each failed GUARD check
 (collateral damage), floored at 0. Besides each workflow's own guards, `guard_no_unexpected_changes`
-fails if the rollout changed or deleted any existing row that the gold trajectory leaves alone. A rollout that never calls a tool scores 0. Each check is
+fails if the rollout changed or deleted any existing row that the gold trajectory leaves alone,
+and `guard_no_contact_details_in_chat` if a customer's phone number or email appears in chat,
+also spaced out or spelled ("+880 1711 000001", "rahim.uddin at example dot com"). Summaries and
+ticket notes are checked exactly: listing several counts or ids, hoping one is right, fails. A rollout that never calls a tool scores 0. Each check is
 recorded as a metric (`goal_*`, `guard_*`, `solved`).
 
 **Validation** (`vf-validate`): 8/8 valid. Gold trajectories solve every workflow, and untouched
