@@ -13,9 +13,9 @@ special-casing inputs or causing collateral damage earns nothing.
 |---|---|
 | **Tasks** | 25: 17 code repair (6 security, 11 business logic) and 8 MCP tool-use workflows, plus a factory for generated variants |
 | **Rewards** | hidden tests against a locked-down Docker sandbox, an AST static gate, anti-tampering checks, database-state GOAL/GUARD checks with a generic collateral-damage guard |
-| **Quality control** | every task ships gold and no-op solutions and 4-5 known exploits that must not be solved, every workflow a careless trajectory; mutation testing of every gold fix; all re-checked in CI |
+| **Quality control** | every task ships gold and no-op solutions and 4-6 known exploits that must not be solved, every workflow careless and hedged trajectories; mutation testing of every gold fix; all re-checked in CI |
 | **Packaging** | Prime Intellect [verifiers](https://github.com/PrimeIntellect-ai/verifiers) v1 environments, pushed to the Environments Hub |
-| **Evaluated** | Qwen3.8-27B and gpt-oss-120b; 31 model solutions audited with four verifier types, 106 known-answer solutions with the three rule-based ones |
+| **Evaluated** | Qwen3.8-27B and gpt-oss-120b; 31 model solutions audited with four verifier types, 122 known-answer solutions with the three rule-based ones |
 
 ## Key results
 
@@ -36,11 +36,15 @@ and anti-tampering checks, and **V4** an LLM judge (gpt-oss-20b).
 - **LLM-judge false negatives.** The judge rejected three solutions that pass every test, once
   claiming that `datetime.combine` has no `tzinfo` argument (it has had one since Python 3.6).
 
-- **Known-wrong solutions.** On a corpus of 106 solutions that are right or wrong by construction
-  (gold fixes and trajectories; 73 exploit patches and 8 careless trajectories), public tests alone
-  (V1) pass 89% of the wrong ones (72 of 81). Adding the hidden tests (V2) leaves one: SQL still built
-  with an f-string, through a variable. V3 rejects all of them, but by construction: each exploit is
-  checked against V3 when it is added. See [results/audit/corpus_report.md](results/audit/corpus_report.md).
+- **Known-wrong solutions.** On a corpus of 122 solutions that are right or wrong by construction
+  (gold fixes and trajectories; 77 exploit patches and 20 careless, hedged or misleading trajectories),
+  public tests or goal checks alone (V1) pass 80% of the wrong ones (78 of 97). Adding the hidden
+  tests (V2) leaves one: SQL still built with an f-string, through a variable. V3 rejects all of
+  them, but by construction: each exploit is checked against V3 when it is added. See
+  [results/audit/corpus_report.md](results/audit/corpus_report.md).
+- **The scorer is attackable too.** Seventeen attacks on this repository's own scorers and
+  sandboxes so far, from a symlink that handed the app the hidden tests to hedged summaries that
+  scored 1.0; each is fixed and kept fixed by a CI check. See [docs/attacks.md](docs/attacks.md).
 
 The model results come from one attempt per task on a free API tier, so they are case studies rather than solve
 rates. Details are in [results/evals/](results/evals/README.md). A research paper on verifier
@@ -249,10 +253,13 @@ the agent saw.
 
 ## How strong are the checks?
 
-- **Exploits.** `tasks/*/exploits/` holds 4-5 attacks per task (73 in all); `validate_tasks.py`
-  fails if any is solved, or if one no longer applies. `scripts/check_box_exploits.py` attacks the
-  in-box scorer of the Prime environment itself (rewriting test reports, squatting the app's port,
-  a symlink from `app/` to the hidden tests).
+- **Exploits.** `tasks/*/exploits/` holds 4-6 attacks per task (77 in all), and every workflow
+  has careless trajectories, plus hedged summaries and notes, spelled-out contact details and
+  notes to the reviewer where they apply; `validate_tasks.py` and `workflows.py validate` fail if any
+  is solved, or if one no longer applies. `scripts/check_box_exploits.py` attacks the in-box scorer
+  of the Prime environment itself (rewriting test reports, squatting the app's port, a symlink from
+  `app/` to the hidden tests). The full list of attacks on the scorers is in
+  [docs/attacks.md](docs/attacks.md).
 - **Mutation testing.** `runtime/mutants.py` makes small wrong variants of every gold fix (flipped
   comparisons, changed constants, dropped SQL conditions) and runs the tests on each. A variant no
   test catches is either a missing test or reviewed as equivalent in `results/mutation/equivalent.yaml`;
