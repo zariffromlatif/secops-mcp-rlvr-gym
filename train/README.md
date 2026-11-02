@@ -57,10 +57,11 @@ to fix bugs.
 
 ## Running
 
-On limited GPU time, use the campaign: one command per session runs everything below in order,
-alternates the V3 and V2 runs so they always have the same number of steps, and stops before a
-deadline (`python -m train.campaign --deadline 12:40`; see the lab guide in
-[docs/bracu-pc.md](../docs/bracu-pc.md)). The steps one by one:
+Use the campaign: one command runs everything below in order, alternates the V3 and V2 runs so
+they always have the same number of steps, evaluates both at each milestone, and continues after
+any stop (`python -m train.campaign --steps 400 --evaluate-at 100 200`; add `--deadline 12:40` to
+stop by a set time). Step by step for the lab PC: [docs/lab-runbook.md](../docs/lab-runbook.md).
+The steps one by one:
 
 ```bash
 uv pip install -r train/requirements.txt     # CUDA GPU; these packages are not in the main lockfile
@@ -124,5 +125,5 @@ Generation will take most of each step; scoring 32 answers with 8 warm workers t
 Measure seconds per step in the smoke run before planning: 200 steps at 90 s each is 5 hours.
 
 No training run is checked in yet. CI runs `--dry-run`, [tests/test_train.py](../tests/test_train.py)
-and a 2-step training plus evaluation with a tiny model on CPU, so the code path you run on the GPU
-is exercised on every push.
+and the whole campaign with a tiny model on CPU (2 steps, evaluated at steps 1 and 2), so the code
+path you run on the GPU is exercised on every push.

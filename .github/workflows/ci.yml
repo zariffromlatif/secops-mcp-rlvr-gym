@@ -93,12 +93,13 @@ jobs:
           uv pip install -r train/requirements.txt
       - name: The whole campaign (scorer check, tasks, baseline, alternating training, evaluations, report)
         run: |
-          uv run --no-sync python -m train.campaign --deadline "$(date -d '+3 hours' +%H:%M)" \
+          uv run --no-sync python -m train.campaign \
             --model trl-internal-testing/tiny-Qwen2ForCausalLM-2.5 --allow-cpu --sandbox local \
-            --steps 2 --chunk 1 -k 1 --heldout-count 1 --extra-count 1 --batch 4 --grad-accum 1 \
+            --steps 2 --evaluate-at 1 --chunk 1 -k 1 --heldout-count 1 --extra-count 1 --batch 4 --grad-accum 1 \
             --num-generations 4 --max-completion-length 48 --workers 2 --secret-file .tmp/secret --out .tmp/campaign
           grep -q "campaign complete" .tmp/campaign/campaign.log
-          test "$(wc -l < .tmp/campaign/v3/samples.jsonl)" -eq 8 && test -f .tmp/campaign/eval-v2-heldout/summary.json
+          test "$(wc -l < .tmp/campaign/v3/samples.jsonl)" -eq 8
+          test -f .tmp/campaign/eval-v2-s1-heldout/summary.json && test -f .tmp/campaign/eval-v2-s2-heldout/summary.json
 
   verifiers:
     # Both Prime Intellect environments, through verifiers' own validator.

@@ -1,7 +1,8 @@
 """The whole V2-vs-V3 training comparison, one command per lab session. Each stage runs once; the
 command stops cleanly before --deadline, and the same command next session continues.
 
-    uv run --no-sync python -m train.campaign --deadline 12:40
+    uv run --no-sync python -m train.campaign --deadline 12:40          # a session that must end at 12:40
+    uv run --no-sync python -m train.campaign --steps 400 --evaluate-at 100 200   # no time limit
 
 Stages, in order:
     check     the GPU is visible to PyTorch and free (stop Ollama first); a scorer that works:
@@ -13,8 +14,13 @@ Stages, in order:
     baseline  the base model, k answers per task, on the training and the held-out tasks
     train     the runs (v3 and v2) in chunks of --chunk steps, alternating, so they have the same
               number of steps whenever time runs out, and are compared fairly at that point
-    evaluate  each finished run's adapter on the training and the held-out tasks
-    report    <out>/README.md: the runs over training, and every evaluation side by side
+    evaluate  both runs' adapters on the training and the held-out tasks, at every milestone
+              (--evaluate-at, and --steps itself), so a complete comparison exists at each one
+    report    <out>/README.md, rewritten after every milestone: the runs over training, and every
+              evaluation side by side
+
+Without --deadline it runs until the last milestone is evaluated. Stopped for any reason (Ctrl+C,
+a reboot, a crash), the same command continues from the last checkpoint.
 
 Works on Linux and on Windows without WSL (with Docker Desktop for the warm sandbox, or any
 Postgres for local mode). What is done is in <out>/state.json, the full output in <out>/campaign.log.
@@ -57,7 +63,7 @@ class Campaign:
         self.logfile.flush()
 
     def minutes_left(self) -> float:
-        return (self.deadline - time.time()) / 60
+        return (self.deadline - time.time()) / 60 if self.deadline else float("inf")
 
     def save(self) -> None:
         self.state_path.write_text(json.dumps(self.state, indent=2) + "\n")
@@ -148,6 +154,9 @@ class Campaign:
                 self.fail(f"tasks in {folder} do not validate")
         self.mark("tasks")
 
+    def milestones(self) -> list[int]:
+        return sorted({m for m in self.args.evaluate_at if 0 < m < self.args.steps} | {self.args.steps})
+
     def evaluate(self, name: str, adapter: Path | None) -> None:
         """name/train and name/heldout evaluations, each skipped once it exists."""
         for split, folders in (("train", TRAIN_TASKS), ("heldout", [HELDOUT])):
@@ -168,21 +177,22 @@ class Campaign:
         steps = [int(p.name.split("-")[1]) for p in (self.out / run).glob("checkpoint-*")]
         return max(steps, default=0)
 
-    def train(self) -> None:
-        runs, target = self.args.runs, self.args.steps
+    def train(self, target: int) -> None:
+        runs = self.args.runs
         while True:
             done = {run: self.steps_done(run) for run in runs}
-            self.log("steps so far: " + ", ".join(f"{run} {done[run]}/{target}" for run in runs))
             pending = [run for run in runs if done[run] < target]
             if not pending:
                 return
+            self.log("steps so far: " + ", ".join(f"{run} {done[run]}/{target}" for run in runs))
             run = min(pending, key=lambda r: (done[r], runs.index(r)))  # the run that is behind
             if self.minutes_left() < self.args.min_chunk_minutes:
                 self.stop(f"less than {self.args.min_chunk_minutes} minutes left for another chunk")
             goal = min(done[run] + self.args.chunk, target)
             started = time.time()
+            deadline = ["--deadline", self.args.deadline] if self.args.deadline else []
             if self.python("-m", "train.grpo", "--model", self.args.model, "--reward", run, "--tasks", *TRAIN_TASKS,
-                           "--steps", str(goal), "--out", str(self.out / run), "--resume", "--deadline", self.args.deadline,
+                           "--steps", str(goal), "--out", str(self.out / run), "--resume", *deadline,
                            "--sandbox", self.sandbox, "--workers", str(self.args.workers),
                            "--batch", str(self.args.batch), "--grad-accum", str(self.args.grad_accum),
                            "--num-generations", str(self.args.num_generations),
@@ -191,10 +201,12 @@ class Campaign:
             advanced = self.steps_done(run) - done[run]
             if advanced:
                 pace = (time.time() - started) / advanced
-                left = sum(target - self.steps_done(r) for r in runs) * pace / 3600
+                left = sum(self.args.steps - self.steps_done(r) for r in runs) * pace / 3600
                 self.log(f"pace: {pace:.0f} s per step (model loading included); about {left:.1f} h of training left")
             if self.steps_done(run) < goal:
-                self.stop("the deadline is near; the next session continues from the last checkpoint")
+                if self.deadline:
+                    self.stop("the deadline is near; the next session continues from the last checkpoint")
+                self.fail(f"training {run} stopped at step {self.steps_done(run)}, before step {goal}; see the log above")
 
     def report(self) -> None:
         runs = [run for run in self.args.runs if (self.out / run / "samples.jsonl").exists()]
@@ -202,19 +214,20 @@ class Campaign:
                                 "--out", str(self.out / "README.md")):
             self.fail("report failed")
         rows = []
-        for name in ["base", *self.args.runs]:
+        evaluated = [("base", 0, "base")] + [(run, m, f"{run}-s{m}") for m in self.milestones() for run in self.args.runs]
+        for model, steps, name in evaluated:
             for split in ("train", "heldout"):
                 summary = self.out / f"eval-{name}-{split}" / "summary.json"
                 if summary.exists():
                     o = json.loads(summary.read_text())["overall"]
-                    rows.append(f"| {name} | {split} | {o['v1']:.3f} | {o['v2']:.3f} | {o['v3']:.3f} | {o['solved']:.1%} "
-                                f"| {o['any']:.1%} |")
+                    rows.append(f"| {model} | {steps} | {split} | {o['v1']:.3f} | {o['v2']:.3f} | {o['v3']:.3f} "
+                                f"| {o['solved']:.1%} | {o['any']:.1%} |")
         text = (self.out / "README.md").read_text() if (self.out / "README.md").exists() else "# Training runs\n"
         text += ("\n## Evaluations\n\n"
                  f"{self.args.model}, {self.args.k} answers per task; heldout: {HELDOUT}/ (secret seed). "
                  f"Scorer: {', '.join(sorted({s['sandbox'] for s in self.state.get('sandboxes', [])}))}.\n\n"
-                 "| model | tasks | v1 | v2 | v3 | solved (pass@1) | any solved (pass@k) |\n"
-                 "|---|---|---:|---:|---:|---:|---:|\n" + "\n".join(rows) + "\n")
+                 "| model | steps | tasks | v1 | v2 | v3 | solved (pass@1) | any solved (pass@k) |\n"
+                 "|---|---:|---|---:|---:|---:|---:|---:|\n" + "\n".join(rows) + "\n")
         (self.out / "README.md").write_text(text)
         self.log(f"report: {self.out / 'README.md'}")
 
@@ -227,30 +240,41 @@ class Campaign:
         if self.state["model"] != self.args.model:
             self.fail(f"this campaign uses {self.state['model']}; start a new one with another --out")
         self.save()
-        self.log(f"session starts; {self.minutes_left():.0f} minutes until {self.args.deadline}")
+        self.log(f"session starts; {self.minutes_left():.0f} minutes until {self.args.deadline}" if self.deadline
+                 else f"session starts, no deadline; milestones {self.milestones()} steps")
         self.check()
         self.tasks()
         if not self.done("baseline"):
             self.evaluate("base", None)
             self.mark("baseline")
-        self.train()
-        if not self.done("evaluate"):
-            for run in self.args.runs:
-                self.evaluate(run, self.out / run / "final")
-            self.mark("evaluate")
-        self.report()
-        if not self.done("report"):
-            self.mark("report")
+        for milestone in self.milestones():
+            self.train(milestone)
+            if not self.done(f"evaluate@{milestone}"):
+                # The weights at the milestone itself: its checkpoint, or the final adapter if no run went past it.
+                adapters = {}
+                for run in self.args.runs:
+                    checkpoint = self.out / run / f"checkpoint-{milestone}"
+                    adapters[run] = checkpoint if checkpoint.exists() else (
+                        self.out / run / "final" if self.steps_done(run) == milestone else None)
+                if None in adapters.values():
+                    self.log(f"milestone {milestone} skipped: the runs are past it and its checkpoint is gone")
+                    continue
+                for run, adapter in adapters.items():
+                    self.evaluate(f"{run}-s{milestone}", adapter)
+                self.mark(f"evaluate@{milestone}")
+            self.report()
         self.status()
         self.log("campaign complete")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--deadline", required=True, help="HH:MM local time; leave time to push results")
+    parser.add_argument("--deadline", help="HH:MM local time to stop by (leave time to push results); none = no limit")
     parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
     parser.add_argument("--runs", nargs="+", default=["v3", "v2"], choices=["v1", "v2", "v3"])
     parser.add_argument("--steps", type=int, default=100, help="training steps per run")
+    parser.add_argument("--evaluate-at", type=int, nargs="*", default=[],
+                        help="extra milestones (steps) at which both runs are evaluated; --steps always is")
     parser.add_argument("--chunk", type=int, default=25, help="steps per turn; runs alternate")
     parser.add_argument("-k", type=int, default=4, help="answers per task in evaluations")
     parser.add_argument("--heldout-count", type=int, default=3, help="held-out tasks per factory family")
@@ -268,6 +292,9 @@ def main() -> None:
     parser.add_argument("--min-chunk-minutes", type=float, default=20)
     parser.add_argument("--allow-cpu", action="store_true", help="smoke tests with a tiny model only")
     args = parser.parse_args()
+    # The training libraries' progress bars use block characters; a Windows console or pipe set to
+    # cp1252 could not print them, and this process echoes them.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if shutil.which("git") is None:
         raise SystemExit("git is needed (patches are applied with git apply)")
     Campaign(args).go()

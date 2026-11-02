@@ -288,7 +288,8 @@ uv run python runtime/validate_tasks.py --tasks-dir tasks_generated --sandbox do
 `train/` runs GRPO (TRL, LoRA) on the patch tasks with V1, V2 or V3 as the reward, and logs all
 three for every sample, so a run trained on public tests shows how often it is paid for answers the
 full verifier rejects. See [train/README.md](train/README.md); `python -m train.grpo --dry-run`
-checks the reward without a model or GPU.
+checks the reward without a model or GPU. Running it on the lab GPU, step by step:
+[docs/lab-runbook.md](docs/lab-runbook.md).
 
 ## Contamination
 

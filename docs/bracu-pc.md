@@ -97,56 +97,14 @@ git push -u origin HEAD
 
 ## Training runs (GRPO)
 
-One command per session runs the whole experiment ([train/campaign.py](../train/campaign.py)): it
-checks the GPU and the scorer, makes the held-out tasks, measures the base model, trains V3 and V2
-in turns, evaluates both and writes the report. It stops cleanly before the time you give it, and
-the same command next session continues where it stopped. WSL is not needed. The experiment
-itself is described in [train/README.md](../train/README.md).
-
-### Once: setup (Windows, PowerShell or Git Bash; on Ubuntu the same without the Windows notes)
+Follow **[lab-runbook.md](lab-runbook.md)**: the setup, the live rollouts, the training run, sending
+results back, and the judge and red-team runs, step by step with checks and fixes. In short, after a
+one-time setup and with Ollama quit, one command runs the whole V3-vs-V2 experiment, and the same
+command continues it after any stop:
 
 ```bash
-git clone https://github.com/zariffromlatif/secops-mcp-rlvr-gym.git
-cd secops-mcp-rlvr-gym
-uv sync --extra mcp
+uv run --no-sync python -m train.campaign --steps 400 --evaluate-at 100 200
 ```
-
-1. **PyTorch with CUDA.** On Windows, PyPI's `torch` is CPU-only. Open pytorch.org/get-started,
-   choose Stable, Windows, Pip, Python and the newest CUDA, and run the command it shows with
-   `uv pip install` in place of `pip3 install`. On Ubuntu, skip this step.
-2. **The training packages:** `uv pip install -r train/requirements.txt`
-3. **A scorer.** If Docker Desktop runs on this PC, nothing to do: the campaign uses the isolated
-   warm sandbox. If it doesn't (it needs WSL2 or Hyper-V), install PostgreSQL 16 from
-   postgresql.org, create a database named `gym` (pgAdmin, or `createdb -U postgres gym` from
-   PostgreSQL's `bin` folder), and set
-   `DATABASE_URL=postgresql+psycopg://postgres:<your password>@localhost:5432/gym` (PowerShell:
-   `$env:DATABASE_URL="..."`). The campaign then uses local mode, which is not isolated; the report
-   says which scorer was used.
-
-### Each session
-
-1. **Free the GPU.** Ollama keeps its model loaded and gpt-oss-20b holds 13 of the 16 GB: quit
-   Ollama (tray icon, or `ollama stop local/gpt-oss-20b`). Don't run evaluations in the same session.
-2. Run, with a stop time that leaves 15 minutes to push:
-   ```bash
-   git pull
-   uv run --no-sync python -m train.campaign --deadline 12:40
-   ```
-3. Push the results (the commands under "Getting results back"). `results/train/` holds the
-   samples, evaluations and report; model weights are git-ignored.
-
-Keep the terminal open and the PC awake until the deadline (Windows: Settings, Power, Sleep:
-Never). If the job is interrupted anyway, run the same command again: at most 25 training steps are
-lost. The command refuses to start when the GPU is busy or the scorer fails its check, and says why.
-
-**The first session** generates the held-out tasks: their secret goes to
-`~/.secops-gym-heldout-secret`. Keep that file; it is what makes the held-out tasks unknown to
-everyone else. On a shared account, copy it somewhere private and delete it from the PC.
-
-**How many sessions:** the log prints the pace after every chunk ("about N h of training left").
-The defaults (1.5B model, 100 steps per run, 4 answers per task in evaluations) are meant to fit
-in two or three sessions. If the first session's pace says otherwise, pass `--steps 50` next time:
-both runs always have the same number of steps, so a shorter comparison is still a fair one.
 
 ## Safety on a shared PC
 - No Groq or Gemini keys are needed here: the local server needs none (the scripts use a dummy
