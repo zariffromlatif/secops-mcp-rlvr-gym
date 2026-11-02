@@ -35,5 +35,5 @@ sh scripts/devbox.sh sh -c "
 "
 # Interrupted workflow rollouts can leave their episode databases behind.
 if [ "$ENV" = "workflows" ] || [ "$ENV" = "resume" ]; then
-    uv run python runtime/workflows.py cleanup >/dev/null 2>&1 || true
+    uv run --no-sync python runtime/workflows.py cleanup >/dev/null 2>&1 || true
 fi

@@ -11,12 +11,13 @@ do if you don't. Part 1 happens once; on later visits start at Part 2.
 | 4 | Send the results back | 5 minutes | your GitHub login |
 | 5 | Judges, red team and contamination probe | a few hours | Ollama, Docker; not while training |
 
-**Where to type commands.** On Windows, use **Git Bash** (Start menu, "Git Bash"), not PowerShell or
-cmd: every command below is written for it. On Ubuntu, any terminal. Copy one block at a time.
+**Where to type commands.** On Windows, use **Git Bash** (Start menu, "Git Bash"), not cmd: every
+command below is written for it. For PowerShell, the same commands are in
+[lab-powershell.md](lab-powershell.md). On Ubuntu, any terminal. Copy one block at a time.
 
 **Two rules that prevent most problems:**
-1. Always start Python commands with `uv run --no-sync`. Plain `uv run` or `uv sync` removes the
-   training packages; if that happens, repeat step 1.5.
+1. Always start Python commands with `uv run --no-sync`. `uv sync` removes the training packages
+   and plain `uv run` can change them; if that happens, repeat step 1.5.
 2. Never commit or share the file `~/.secops-gym-heldout-secret` (Part 3 creates it).
 
 ---
@@ -64,6 +65,14 @@ ls train/campaign.py
 The last line must print `train/campaign.py`. **The training code is on the branch
 `ccr-cfcbcb20-dpk9k3`, not on `main`.** If git asks you to sign in, sign in with your GitHub account
 in the browser window it opens.
+
+Then give git your name and email for the commits in Part 4 (for this repository only, which suits
+a shared PC):
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
 
 ### 1.4 Install the project
 
@@ -317,7 +326,7 @@ These use the local model through Ollama, so run them when training is not runni
 ```bash
 cd ~/secops-mcp-rlvr-gym
 ollama run local/gpt-oss-20b "Say hi"
-export LOCAL_API_KEY=local
+export LOCAL_API_KEY=local PYTHONUTF8=1
 ```
 
 **5.1 The LLM judges (V4, V5) on all 122 known-answer solutions.** This takes a few hours. Answers
