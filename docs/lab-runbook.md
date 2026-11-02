@@ -5,7 +5,7 @@ do if you don't. Part 1 happens once; on later visits start at Part 2.
 
 | Part | What | Time | Needs |
 |---|---|---|---|
-| 1 | One-time setup | about 1 hour, mostly downloads | admin rights to install software |
+| 1 | One-time setup | about 1 hour, mostly downloads | admin rights to install software, about 30 GB of free disk |
 | 2 | Two live rollouts (unblocks the v0.3.0 Hub release) | 20-30 minutes | Ollama, Docker |
 | 3 | The training run (V3 vs V2) | many hours; runs unattended | the GPU free of Ollama |
 | 4 | Send the results back | 5 minutes | your GitHub login |
@@ -139,6 +139,35 @@ sandbox image once. You should see a table of 17 tasks in which every **gold** c
 `1.00/1.00/1.00`, ending in `34 samples scored`. If any gold value is not `1.00/1.00/1.00`, stop
 and send me the output.
 
+### 1.8 Ollama and the local model (for Parts 2 and 5 only)
+
+Skip this if Ollama is already set up with `local/gpt-oss-20b`.
+
+**Windows:** install Ollama from https://ollama.com/download . Then open *Edit environment variables
+for your account* (Start menu, search "environment variables") and add two user variables:
+`OLLAMA_CONTEXT_LENGTH` = `32768` and `OLLAMA_KEEP_ALIVE` = `-1`. Quit Ollama from the taskbar's
+notification area and start it again so it reads them.
+
+**Ubuntu:** `curl -fsSL https://ollama.com/install.sh | sh`, then `sudo systemctl edit ollama`, add
+these lines, save, and run `sudo systemctl restart ollama`:
+
+```
+[Service]
+Environment="OLLAMA_CONTEXT_LENGTH=32768"
+Environment="OLLAMA_KEEP_ALIVE=-1"
+```
+
+**Both:** download the model (about 13 GB) and give it the name the scripts use:
+
+```bash
+ollama pull gpt-oss:20b
+ollama cp gpt-oss:20b local/gpt-oss-20b
+ollama run local/gpt-oss-20b "Say hi"
+ollama ps
+```
+
+The model should answer, and `ollama ps` should show **100% GPU**.
+
 Setup is done.
 
 ---
@@ -146,17 +175,28 @@ Setup is done.
 ## Part 2: two live rollouts (for the v0.3.0 Hub release)
 
 These run one task of each environment with a real model, through the same code the Hub will run.
-They need Ollama set up as in [bracu-pc.md](bracu-pc.md), Step 1 (including
-`OLLAMA_CONTEXT_LENGTH=32768`), and Docker. Skip this part if either is missing.
+They need Docker (1.6a) and Ollama (1.8). Skip this part if either is missing.
+
+**Once:** install the Linux environment the evaluations run in (a "devbox" container; this does not
+touch your training packages). It takes a few minutes the first time.
 
 ```bash
 cd ~/secops-mcp-rlvr-gym
+sh scripts/devbox.sh uv sync --extra mcp --extra envs
+```
+
+**Each time:**
+
+```bash
+cd ~/secops-mcp-rlvr-gym
+sh scripts/devbox.sh uv run --no-sync python scripts/sync_envs.py
 ollama run local/gpt-oss-20b "Say hi"
 LOCAL_LLM=http://host.docker.internal:11434/v1 sh scripts/run_eval.sh patches local/gpt-oss-20b -n 1 --no-push
 LOCAL_LLM=http://host.docker.internal:11434/v1 sh scripts/run_eval.sh workflows local/gpt-oss-20b -n 1 --no-push
 ```
 
-The first line must answer. Each rollout should end with a results summary (a reward between 0 and
+The first line copies the tasks into the environment packages and prints `synced environments`.
+The model must answer. Each rollout should end with a results summary (a reward between 0 and
 1), not an error. Whether the model solves the task does not matter: this checks that a live agent
 runs end to end. The output lands in `.tmp/evals/`. If either fails, copy its last 40 lines and send
 them to me.
