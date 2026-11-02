@@ -42,12 +42,15 @@ winget install --id Git.Git -e --source winget --scope user
 ```
 
 ```powershell
-# 1.3 The code, on the branch that has the training code (must print True)
-Set-Location $HOME
+# 1.3 The code, on the branch that has the training code (must print True). Run this in the
+# folder you keep your work in (for example D:\USER1\<you>); the repository goes inside it.
 git clone https://github.com/zariffromlatif/secops-mcp-rlvr-gym.git
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location secops-mcp-rlvr-gym
 git checkout ccr-cfcbcb20-dpk9k3
 Test-Path train\campaign.py
+# Remember where it is: every later block starts with Set-Location $env:GYM_REPO
+[Environment]::SetEnvironmentVariable("GYM_REPO", "$PWD", "User")
+$env:GYM_REPO = "$PWD"
 # Your name and email for the commits in Part 4 (this repository only)
 git config user.name "Your Name"
 git config user.email "you@example.com"
@@ -55,6 +58,7 @@ git config user.email "you@example.com"
 
 ```powershell
 # 1.4 The project, then PyTorch with CUDA (copy the cu... part from https://pytorch.org/get-started/locally/)
+Set-Location $env:GYM_REPO
 uv sync --extra mcp
 uv pip install torch --index-url https://download.pytorch.org/whl/cu128
 uv pip install -r train/requirements.txt
@@ -67,25 +71,30 @@ uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu
 ```
 
 ```powershell
-# 1.5 PostgreSQL without admin rights: the official zip (about 330 MB), run as you
-Set-Location $HOME
-curl.exe -L -o pg16.zip https://get.enterprisedb.com/postgresql/postgresql-16.15-1-windows-x64-binaries.zip
-tar -xf pg16.zip pgsql/bin pgsql/lib pgsql/share "pgsql/pgAdmin 4/python/vcruntime140.dll" "pgsql/pgAdmin 4/python/vcruntime140_1.dll"
-Remove-Item pg16.zip
+# 1.5 PostgreSQL without admin rights: the official zip (about 330 MB), run as you. It lives in the
+# repository's .tmp folder, which git ignores.
+Set-Location $env:GYM_REPO
+New-Item -ItemType Directory -Force .tmp | Out-Null
+curl.exe -L -o .tmp\pg16.zip https://get.enterprisedb.com/postgresql/postgresql-16.15-1-windows-x64-binaries.zip
+tar -xf .tmp\pg16.zip -C .tmp pgsql/bin pgsql/lib pgsql/share "pgsql/pgAdmin 4/python/vcruntime140.dll" "pgsql/pgAdmin 4/python/vcruntime140_1.dll"
+Remove-Item .tmp\pg16.zip
+# Must print True
+Test-Path .tmp\pgsql\bin\initdb.exe
 # The Visual C++ runtime it needs, if Windows lacks it
-if (-not (Test-Path "$env:WINDIR\System32\vcruntime140_1.dll")) { Copy-Item "$HOME\pgsql\pgAdmin 4\python\vcruntime140*.dll" "$HOME\pgsql\bin\" }
-# A database cluster in your home folder, with a random password, on port 5433 (localhost only).
+if (-not (Test-Path "$env:WINDIR\System32\vcruntime140_1.dll")) { Copy-Item ".tmp\pgsql\pgAdmin 4\python\vcruntime140*.dll" .tmp\pgsql\bin\ }
+# A database cluster with a random password, on port 5433 (localhost only); must end in "Success".
 # --no-locale sorts text byte by byte, exactly like the database the scorer was validated on.
 $pgpw = -join ((48..57) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
-Set-Content "$HOME\pgpass.tmp" $pgpw -NoNewline -Encoding ascii
-& "$HOME\pgsql\bin\initdb.exe" -D "$HOME\pgdata" -U postgres -E UTF8 --no-locale --auth=scram-sha-256 --pwfile="$HOME\pgpass.tmp"
-Remove-Item "$HOME\pgpass.tmp"
-Add-Content "$HOME\pgdata\postgresql.conf" "port = 5433"
-# Start it in the background, wait until it answers, create the database gym
-Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
-do { Start-Sleep 2; & "$HOME\pgsql\bin\pg_isready.exe" -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
+Set-Content .tmp\pgpass.tmp $pgpw -NoNewline -Encoding ascii
+.\.tmp\pgsql\bin\initdb.exe -D "$PWD\.tmp\pgdata" -U postgres -E UTF8 --no-locale --auth=scram-sha-256 --pwfile="$PWD\.tmp\pgpass.tmp"
+Remove-Item .tmp\pgpass.tmp
+Add-Content .tmp\pgdata\postgresql.conf "port = 5433"
+# Start it in the background and wait until it answers (if this takes over a minute: Ctrl+C, then
+# Get-Content .tmp\pgdata\server.log -Tail 20), then create the database gym
+Start-Process -WindowStyle Hidden -FilePath "$PWD\.tmp\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$PWD\.tmp\pgdata`" -l `"$PWD\.tmp\pgdata\server.log`" start"
+do { Start-Sleep 2; .\.tmp\pgsql\bin\pg_isready.exe -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
 $env:PGPASSWORD = $pgpw
-& "$HOME\pgsql\bin\createdb.exe" -h localhost -p 5433 -U postgres gym
+.\.tmp\pgsql\bin\createdb.exe -h localhost -p 5433 -U postgres gym
 # Tell the project where it is (remembered for new windows too)
 $url = "postgresql+psycopg://postgres:$pgpw@localhost:5433/gym"
 [Environment]::SetEnvironmentVariable("DATABASE_URL", $url, "User")
@@ -94,7 +103,7 @@ $env:DATABASE_URL = $url
 
 ```powershell
 # 1.6 The scorer, before any model: every gold column 1.00/1.00/1.00, ending in "34 samples scored"
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location $env:GYM_REPO
 uv run --no-sync python -m train.grpo --dry-run --sandbox local
 ```
 
@@ -124,11 +133,11 @@ They need Docker, so not on this PC. Skip this part.
 
 ```powershell
 # 3.1 Before each start
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location $env:GYM_REPO
 git pull
 # PostgreSQL (after every reboot; "server started" or "another server might be running" are both fine)
-Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
-do { Start-Sleep 2; & "$HOME\pgsql\bin\pg_isready.exe" -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
+Start-Process -WindowStyle Hidden -FilePath "$PWD\.tmp\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$PWD\.tmp\pgdata`" -l `"$PWD\.tmp\pgdata\server.log`" start"
+do { Start-Sleep 2; .\.tmp\pgsql\bin\pg_isready.exe -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
 # Free the GPU: quit Ollama, then Memory-Usage must be under about 1,000 MiB
 Get-Process -Name "ollama*" -ErrorAction SilentlyContinue | Stop-Process -Force
 nvidia-smi
@@ -146,7 +155,7 @@ uv run --no-sync python -m train.campaign --steps 400 --evaluate-at 100 200 --ba
 
 ```powershell
 # In a second PowerShell window, to watch it
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location $env:GYM_REPO
 Get-Content results\train\campaign.log -Tail 20 -Wait
 nvidia-smi -l 10
 # The last 40 lines, to send when something goes wrong
@@ -156,7 +165,7 @@ Get-Content results\train\campaign.log -Tail 40
 ## Part 4: send the results back
 
 ```powershell
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location $env:GYM_REPO
 git add results/train
 git commit -m "Lab training results $(Get-Date -Format yyyy-MM-dd)"
 git push
@@ -172,13 +181,13 @@ cmdkey /delete:git:https://github.com
 ## Part 5: LLM judge and contamination probe (not while training)
 
 ```powershell
-Set-Location $HOME\secops-mcp-rlvr-gym
+Set-Location $env:GYM_REPO
 Start-Process "$env:LOCALAPPDATA\Programs\Ollama\ollama app.exe"
 do { Start-Sleep 2; try { $up = (Invoke-RestMethod http://localhost:11434/api/version).version } catch { $up = $null } } until ($up)
 ollama run local/gpt-oss-20b "Say hi"
 $env:LOCAL_API_KEY = "local"
 # PostgreSQL, if the PC restarted since Part 3
-Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
+Start-Process -WindowStyle Hidden -FilePath "$PWD\.tmp\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$PWD\.tmp\pgdata`" -l `"$PWD\.tmp\pgdata\server.log`" start"
 ```
 
 ```powershell
