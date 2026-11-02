@@ -37,7 +37,11 @@ machine):
 | `docker` | 7.5 s | yes | the sandbox built from scratch for every sample |
 
 Report results from an isolated run: a reward the policy can game in-process measures the sandbox,
-not the verifier.
+not the verifier. A run that had to use `local` (a PC without Docker or admin rights) can be checked
+afterwards on any machine with Docker: [rescore.py](rescore.py) scores every recorded answer again in
+the warm sandbox and lists the answers whose reward was higher when recorded (`python -m train.rescore
+results/train`; rebuild the generated tasks first, see its `--help`). None means the local numbers
+stand.
 
 ## Which rewards to compare
 
@@ -125,5 +129,6 @@ Generation will take most of each step; scoring 32 answers with 8 warm workers t
 Measure seconds per step in the smoke run before planning: 200 steps at 90 s each is 5 hours.
 
 No training run is checked in yet. CI runs `--dry-run`, [tests/test_train.py](../tests/test_train.py)
-and the whole campaign with a tiny model on CPU (2 steps, evaluated at steps 1 and 2), so the code
-path you run on the GPU is exercised on every push.
+and the whole campaign with a tiny model on CPU (2 steps, evaluated at steps 1 and 2) in local mode,
+then re-scores its answers in the warm sandbox, so the code path you run on the GPU is exercised on
+every push.

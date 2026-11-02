@@ -85,7 +85,7 @@ def parse_deadline(text: str | None) -> float | None:
 
 def gold_main(task_dir: Path) -> str:
     sp.TMP_ROOT.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="gold-", dir=sp.TMP_ROOT) as tmp:
+    with tempfile.TemporaryDirectory(prefix="gold-", dir=sp.TMP_ROOT, ignore_cleanup_errors=True) as tmp:
         sp.prepare_workdir(task_dir, Path(tmp))
         assert sp.apply_patch(Path(tmp), task_dir / "gold.patch")[0], f"{task_dir.name}: gold patch does not apply"
         return (Path(tmp) / "app" / "main.py").read_text()

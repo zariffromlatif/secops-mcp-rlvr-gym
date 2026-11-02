@@ -61,9 +61,10 @@ class Scorer:
         for i, target in enumerate(targets):
             report = work / f"report-{i}.xml"
             try:
+                # No pipes: a process the answer starts could hold one open and outlive the timeout.
                 subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--timeout=20",
                                 "--timeout-method=thread", f"--junitxml={report}", target],
-                               cwd=work, env=env, capture_output=True, timeout=120)
+                               cwd=work, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
             except subprocess.TimeoutExpired:
                 pass
             counts.append(parse_junit(report))
@@ -83,7 +84,8 @@ class Scorer:
         hidden_regression = [t for t in scoring["regression"] if t != "tests_public"]
         target = scoring.get("security") or scoring["target"]
         sp.TMP_ROOT.mkdir(exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="train-", dir=sp.TMP_ROOT) as tmp:
+        # ignore_cleanup_errors: on Windows a file still open in the folder must not fail the sample
+        with tempfile.TemporaryDirectory(prefix="train-", dir=sp.TMP_ROOT, ignore_cleanup_errors=True) as tmp:
             work = Path(tmp)
             sp.prepare_workdir(task_dir, work)
             (work / "app" / "main.py").write_text(main_py, encoding="utf-8")  # answers aren't ASCII-only

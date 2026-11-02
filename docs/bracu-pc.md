@@ -17,7 +17,7 @@ Ask the lab admin, or check on your first visit:
 | Question | Why it matters |
 |---|---|
 | Which **OS**: Windows 11 or Ubuntu? | The setup steps differ (below). |
-| Do we get **admin / sudo** rights? | Installing Docker, WSL2 and Ollama needs them. If not, ask the admin to install them from the list below. |
+| Do we get **admin / sudo** rights? | Installing Docker and WSL2 needs them (Ollama, uv and PostgreSQL from its zip do not). Without Docker, training still runs, with the local scorer ([lab-powershell.md](lab-powershell.md)), but the agent evaluations below need Docker: ask the admin to install it. |
 | How do we **connect remotely**: SSH, RDP, AnyDesk, Chrome Remote Desktop? Is a VPN needed? | SSH is best for long jobs. With a remote desktop, the job must keep running after you disconnect. |
 | Do **files stay** between sessions, on our own user account? | Models are about 25 GB, so downloading them every session would waste hours. |
 | Can it **download** from ollama.com, Docker Hub, ghcr.io and GitHub? About 40 GB the first time. | A university firewall or proxy might block some of these. |

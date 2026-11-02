@@ -126,7 +126,9 @@ docker compose -f runtime/docker-compose.yml up -d --wait
 
 You should see `Container runtime-db-1 Healthy`.
 
-**b) Without Docker.** Install PostgreSQL 16 from https://www.postgresql.org/download/ and remember
+**b) Without Docker.** No admin rights on Windows: follow [lab-powershell.md](lab-powershell.md)
+instead, which runs PostgreSQL from its zip, without an installer. With admin rights: install
+PostgreSQL 16 from https://www.postgresql.org/download/ and remember
 the password you choose for the `postgres` user. Create a database named `gym` (in pgAdmin:
 Databases, Create, Database, name `gym`). Then, **every time you open Git Bash**, run this line with
 your password:
@@ -135,7 +137,9 @@ your password:
 export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/gym"
 ```
 
-Without Docker the scorer runs in "local" mode, which is not isolated; the report says so.
+Without Docker the scorer runs in "local" mode, which is not isolated; the report says so. After the
+run, every answer is checked again in the isolated sandbox on a machine with Docker (`python -m
+train.rescore`, step 6 of [lab-powershell.md](lab-powershell.md)).
 
 ### 1.7 Check the scorer, before any model is involved
 
@@ -239,8 +243,9 @@ The "Memory-Usage" column should be under about 1,000 MiB, with no `ollama` proc
 `docker compose -f runtime/docker-compose.yml up -d --wait`.
 **Without Docker:** run your `export DATABASE_URL=...` line from step 1.6b.
 
-**Keep the PC awake.** On Windows: Settings, System, Power, set Screen and Sleep to *Never*. You may
-close a Remote Desktop window, but do not sign out: signing out stops the run.
+**Keep the PC awake.** On Windows the campaign keeps the PC from sleeping while it runs (no admin
+rights needed); to be safe, also set Settings, System, Power, Screen and Sleep to *Never* where the
+lab allows it. You may close a Remote Desktop window, but do not sign out: signing out stops the run.
 
 ### 3.2 Start it
 

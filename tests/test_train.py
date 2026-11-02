@@ -105,3 +105,38 @@ def test_evaluation_summary_marks_tasks_without_learning_signal():
     assert s["tasks"]["a"] == {"samples": 2, "v1": 1.0, "v2": 0.5, "v3": 0.75, "solved": 0.5, "any": True, "signal": True}
     assert s["tasks"]["b"]["signal"] is False and s["tasks"]["b"]["any"] is False
     assert s["overall"]["signal"] == 0.5 and s["overall"]["solved"] == 0.25
+
+
+def test_rescore_flags_answers_recorded_higher_than_they_score(scorer, tmp_path):
+    from train import rescore
+
+    task = TASKS / "revenue_double_count_007"
+    gold, buggy = gold_main(task), (task / "app" / "main.py").read_text()
+    honest = scorer.score(task, buggy)
+    row = lambda code, s, step: {"step": step, "task": task.name, "answer": f"```python\n{code}```",  # noqa: E731
+                                 **{k: s[k] for k in ("v1", "v2", "v3", "solved")}}
+    samples = tmp_path / "run" / "samples.jsonl"
+    samples.parent.mkdir()
+    rows = [row(gold, {"v1": 1.0, "v2": 1.0, "v3": 1.0, "solved": True}, 1),
+            row(buggy, honest, 1),
+            row(buggy, {"v1": 1.0, "v2": 1.0, "v3": 1.0, "solved": True}, 2),  # what a scorer trick would record
+            {**row(gold, {"v1": 1.0, "v2": 1.0, "v3": 1.0, "solved": True}, 3), "task": "not_a_task_999"}]
+    samples.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+    loaded = rescore.load([tmp_path])
+    assert len(loaded) == 4 and [rescore.passing(r) for r in loaded] == [True, False, True, True]
+    cache = tmp_path / "cache.jsonl"
+    isolated = rescore.rescore(loaded, scorer, [TASKS], workers=2, cache=cache)
+    assert len(isolated) == 2 and len(cache.read_text().splitlines()) == 2  # two distinct answers, one task missing
+    assert [rescore.compare(r, isolated[rescore.key(r)]) for r in loaded[:3]] == ["same", "same", "inflated"]
+    text, inflated = rescore.render(loaded, isolated, "local")
+    assert inflated == 1 and "| 4 | 2 | 1 | 0 | 1 |" in text and "not_a_task_999" in text
+    # A second run scores nothing again.
+    assert rescore.rescore(loaded, None, [TASKS], workers=2, cache=cache) == isolated
+
+
+def test_campaign_treats_docker_not_installed_as_not_running(monkeypatch):
+    from train import campaign
+
+    monkeypatch.setattr(campaign.shutil, "which", lambda name: None)  # no docker executable at all
+    assert campaign.docker_runs() is False

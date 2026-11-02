@@ -1,10 +1,24 @@
-# Lab runbook in PowerShell
+# Lab runbook in PowerShell, without admin rights
 
-The same steps as [lab-runbook.md](lab-runbook.md), for Windows PowerShell instead of Git Bash. The
-runbook explains each step and what to do when something goes wrong; this page is only the commands,
-in order. Lines starting with `#` are comments. Run one block at a time.
+Every command for the BRAC lab PC, first to last, for Windows PowerShell on an account **without
+admin rights**, so without Docker. [lab-runbook.md](lab-runbook.md) explains each step and what to do
+when something goes wrong. Lines starting with `#` are comments; run one block at a time.
 
-Always start Python commands with `uv run --no-sync`, and never commit or share
+What changes without Docker:
+
+| | Without Docker |
+|---|---|
+| Scoring | "local" mode: a PostgreSQL you run yourself (from its zip, no installer) and the tests in the same Python process as the answer. The campaign picks it on its own. |
+| Training (Part 3) | runs as usual |
+| Two live rollouts (old Part 2) | **not on this PC**: they need Docker. Do them on a machine where you have admin rights, or skip them. |
+| Red team, V5 judge | **not on this PC**: they need the isolated sandbox |
+| Afterwards (Part 6) | every training answer is scored again in the isolated sandbox on a machine with Docker, so a reward earned by a trick that works only in local mode would show up |
+
+Local mode runs the model's answers as you, on this PC, without a sandbox. A 1.5B model writing a
+FastAPI file is very unlikely to do harm, but train under an account that holds nothing you would
+mind losing, and sign out of GitHub after pushing (Part 4).
+
+Two rules: always start Python commands with `uv run --no-sync`, and never commit or share
 `$HOME\.secops-gym-heldout-secret`.
 
 ## Part 1: one-time setup
@@ -13,15 +27,16 @@ Always start Python commands with `uv run --no-sync`, and never commit or share
 # 1.1 The GPU: the table must name NVIDIA GeForce RTX 4080 SUPER
 nvidia-smi
 
-# 1.2 Tools: check what you have, install only what is missing
+# 1.2 Tools: check what you have
 git --version
 uv --version
-docker info
-winget install --id Git.Git -e --source winget
+ollama --version
+# uv (installs for your account only)
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-# Docker Desktop needs WSL2 or Hyper-V; if it will not install or start, skip it and use 1.6b
-winget install --id Docker.DockerDesktop -e --source winget
-# Python output and files in UTF-8 (once)
+# Git, only if git --version failed (for your account only; if winget refuses, run the installer
+# from https://git-scm.com/download/win and choose "Only for me")
+winget install --id Git.Git -e --source winget --scope user
+# Python output and files in UTF-8
 [Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "User")
 # Now close PowerShell and open a new window, so it finds git and uv
 ```
@@ -39,10 +54,8 @@ git config user.email "you@example.com"
 ```
 
 ```powershell
-# 1.4 The project
+# 1.4 The project, then PyTorch with CUDA (copy the cu... part from https://pytorch.org/get-started/locally/)
 uv sync --extra mcp
-
-# 1.5 PyTorch with CUDA (copy the cu... part from https://pytorch.org/get-started/locally/), then the training packages
 uv pip install torch --index-url https://download.pytorch.org/whl/cu128
 uv pip install -r train/requirements.txt
 # Only if bitsandbytes alone failed above:
@@ -54,30 +67,39 @@ uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu
 ```
 
 ```powershell
-# 1.6a With Docker: start Docker Desktop, wait for the engine, start the database (Container runtime-db-1 Healthy)
-Start-Process "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
-do { Start-Sleep 5; docker info *> $null } until ($LASTEXITCODE -eq 0)
-docker compose -f runtime/docker-compose.yml up -d --wait
+# 1.5 PostgreSQL without admin rights: the official zip (about 330 MB), run as you
+Set-Location $HOME
+curl.exe -L -o pg16.zip https://get.enterprisedb.com/postgresql/postgresql-16.15-1-windows-x64-binaries.zip
+tar -xf pg16.zip pgsql/bin pgsql/lib pgsql/share "pgsql/pgAdmin 4/python/vcruntime140.dll" "pgsql/pgAdmin 4/python/vcruntime140_1.dll"
+Remove-Item pg16.zip
+# The Visual C++ runtime it needs, if Windows lacks it
+if (-not (Test-Path "$env:WINDIR\System32\vcruntime140_1.dll")) { Copy-Item "$HOME\pgsql\pgAdmin 4\python\vcruntime140*.dll" "$HOME\pgsql\bin\" }
+# A database cluster in your home folder, with a random password, on port 5433 (localhost only).
+# --no-locale sorts text byte by byte, exactly like the database the scorer was validated on.
+$pgpw = -join ((48..57) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
+Set-Content "$HOME\pgpass.tmp" $pgpw -NoNewline -Encoding ascii
+& "$HOME\pgsql\bin\initdb.exe" -D "$HOME\pgdata" -U postgres -E UTF8 --no-locale --auth=scram-sha-256 --pwfile="$HOME\pgpass.tmp"
+Remove-Item "$HOME\pgpass.tmp"
+Add-Content "$HOME\pgdata\postgresql.conf" "port = 5433"
+# Start it in the background, wait until it answers, create the database gym
+Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
+do { Start-Sleep 2; & "$HOME\pgsql\bin\pg_isready.exe" -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
+$env:PGPASSWORD = $pgpw
+& "$HOME\pgsql\bin\createdb.exe" -h localhost -p 5433 -U postgres gym
+# Tell the project where it is (remembered for new windows too)
+$url = "postgresql+psycopg://postgres:$pgpw@localhost:5433/gym"
+[Environment]::SetEnvironmentVariable("DATABASE_URL", $url, "User")
+$env:DATABASE_URL = $url
 ```
 
 ```powershell
-# 1.6b Without Docker: PostgreSQL 16 (choose a password without @ : / # in the installer), a database named gym
-winget install --id PostgreSQL.PostgreSQL.16 -e --source winget --interactive
-& "$env:ProgramFiles\PostgreSQL\16\bin\createdb.exe" -U postgres gym
-# Put your password in both lines; the first remembers it for new windows
-[Environment]::SetEnvironmentVariable("DATABASE_URL", 'postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/gym', "User")
-$env:DATABASE_URL = 'postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/gym'
-```
-
-```powershell
-# 1.7 The scorer, before any model: every gold column 1.00/1.00/1.00, ending in "34 samples scored"
-uv run --no-sync python -m train.grpo --dry-run
-# Without Docker instead:
+# 1.6 The scorer, before any model: every gold column 1.00/1.00/1.00, ending in "34 samples scored"
+Set-Location $HOME\secops-mcp-rlvr-gym
 uv run --no-sync python -m train.grpo --dry-run --sandbox local
 ```
 
 ```powershell
-# 1.8 Ollama and the local model (Parts 2 and 5 only)
+# 1.7 Ollama and the local model (for Part 5 only; skip what is already there)
 winget install --id Ollama.Ollama -e --source winget
 [Environment]::SetEnvironmentVariable("OLLAMA_CONTEXT_LENGTH", "32768", "User")
 [Environment]::SetEnvironmentVariable("OLLAMA_KEEP_ALIVE", "-1", "User")
@@ -94,28 +116,9 @@ ollama run local/gpt-oss-20b "Say hi"
 ollama ps
 ```
 
-## Part 2: two live rollouts (needs Docker and Ollama)
+## Part 2: the two live rollouts
 
-```powershell
-# Once: the Linux devbox the evaluations run in
-Set-Location $HOME\secops-mcp-rlvr-gym
-$bash = "$env:ProgramFiles\Git\bin\bash.exe"
-& $bash scripts/devbox.sh uv sync --extra mcp --extra envs
-```
-
-```powershell
-# Each time: copy the tasks into the environments ("synced environments"), then one rollout of each
-Set-Location $HOME\secops-mcp-rlvr-gym
-$bash = "$env:ProgramFiles\Git\bin\bash.exe"
-& $bash scripts/devbox.sh uv run --no-sync python scripts/sync_envs.py
-ollama run local/gpt-oss-20b "Say hi"
-$env:LOCAL_LLM = "http://host.docker.internal:11434/v1"
-& $bash scripts/run_eval.sh patches local/gpt-oss-20b -n 1 --no-push
-& $bash scripts/run_eval.sh workflows local/gpt-oss-20b -n 1 --no-push
-Remove-Item Env:LOCAL_LLM
-# The output is in .tmp\evals
-Get-ChildItem .tmp\evals
-```
+They need Docker, so not on this PC. Skip this part.
 
 ## Part 3: the training run
 
@@ -123,23 +126,17 @@ Get-ChildItem .tmp\evals
 # 3.1 Before each start
 Set-Location $HOME\secops-mcp-rlvr-gym
 git pull
+# PostgreSQL (after every reboot; "server started" or "another server might be running" are both fine)
+Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
+do { Start-Sleep 2; & "$HOME\pgsql\bin\pg_isready.exe" -h localhost -p 5433 *> $null } until ($LASTEXITCODE -eq 0)
 # Free the GPU: quit Ollama, then Memory-Usage must be under about 1,000 MiB
 Get-Process -Name "ollama*" -ErrorAction SilentlyContinue | Stop-Process -Force
 nvidia-smi
-# With Docker:
-Start-Process "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
-do { Start-Sleep 5; docker info *> $null } until ($LASTEXITCODE -eq 0)
-docker compose -f runtime/docker-compose.yml up -d --wait
-# Without Docker, only if you did not save DATABASE_URL in 1.6b:
-$env:DATABASE_URL = 'postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/gym'
-# Keep the PC awake on mains power (do not sign out while it runs)
-powercfg /change standby-timeout-ac 0
-powercfg /change hibernate-timeout-ac 0
-powercfg /change monitor-timeout-ac 0
 ```
 
 ```powershell
-# 3.2 Start it; after any stop, run exactly the same command again
+# 3.2 Start it. It picks the local scorer by itself and keeps the PC from sleeping while it runs.
+# After any stop, run exactly the same command again. Do not sign out while it runs.
 uv run --no-sync python -m train.campaign --steps 400 --evaluate-at 100 200
 # Or, to save and stop before a set time:
 uv run --no-sync python -m train.campaign --steps 400 --evaluate-at 100 200 --deadline 23:30
@@ -172,7 +169,7 @@ Get-Content $HOME\.secops-gym-heldout-secret
 cmdkey /delete:git:https://github.com
 ```
 
-## Part 5: judges, red team and contamination probe (not while training)
+## Part 5: LLM judge and contamination probe (not while training)
 
 ```powershell
 Set-Location $HOME\secops-mcp-rlvr-gym
@@ -180,33 +177,35 @@ Start-Process "$env:LOCALAPPDATA\Programs\Ollama\ollama app.exe"
 do { Start-Sleep 2; try { $up = (Invoke-RestMethod http://localhost:11434/api/version).version } catch { $up = $null } } until ($up)
 ollama run local/gpt-oss-20b "Say hi"
 $env:LOCAL_API_KEY = "local"
-# With Docker:
-docker compose -f runtime/docker-compose.yml up -d --wait
+# PostgreSQL, if the PC restarted since Part 3
+Start-Process -WindowStyle Hidden -FilePath "$HOME\pgsql\bin\pg_ctl.exe" -ArgumentList "-D `"$HOME\pgdata`" -l `"$HOME\pgdata\server.log`" start"
 ```
 
 ```powershell
-# 5.1 The LLM judges (V4, V5) on all 122 known-answer solutions (a few hours; an interrupted run continues)
-uv run --no-sync python -m audit.verify results/audit/corpus.jsonl --out results/audit/corpus_verdicts.csv --sandbox warm --judge-model local/gpt-oss-20b --judge-base-url http://localhost:11434/v1 --judge-key-var LOCAL_API_KEY --v5-model local/gpt-oss-20b --v5-base-url http://localhost:11434/v1 --v5-key-var LOCAL_API_KEY
-# Without Docker instead (no V5):
+# 5.1 The V4 judge on all 122 known-answer solutions (a few hours; an interrupted run continues)
 uv run --no-sync python -m audit.verify results/audit/corpus.jsonl --out results/audit/corpus_verdicts.csv --sandbox local --judge-model local/gpt-oss-20b --judge-base-url http://localhost:11434/v1 --judge-key-var LOCAL_API_KEY
 uv run --no-sync python -m audit.analyze results/audit/corpus_verdicts.csv --known results/audit/corpus.jsonl --out results/audit/corpus_report.md
-```
-
-```powershell
-# 5.2 The red team (results in results\hacker; an attempt scored as solved is a hole: report it)
-uv run --no-sync python -m audit.hacker --all --model local/gpt-oss-20b --base-url http://localhost:11434/v1 --key-var LOCAL_API_KEY --attempts 5 --sandbox warm
-# Without Docker: the same with --sandbox local
-uv run --no-sync python -m audit.hacker --all --model local/gpt-oss-20b --base-url http://localhost:11434/v1 --key-var LOCAL_API_KEY --attempts 5 --sandbox local
-```
-
-```powershell
-# 5.3 The contamination probe (a few minutes)
+# 5.2 The contamination probe (a few minutes)
 uv run --no-sync python -m audit.contamination --model local/gpt-oss-20b --base-url http://localhost:11434/v1 --key-var LOCAL_API_KEY --out results/audit/contamination-gpt-oss-20b.json
-```
-
-```powershell
 # Send these back
 git add results
 git commit -m "Lab audit runs $(Get-Date -Format yyyy-MM-dd)"
 git push
 ```
+
+## Part 6: check the training answers in the isolated sandbox (on a machine with Docker)
+
+Not on the lab PC. On any machine with Docker (Linux or Git Bash), after pulling the results; the
+training tasks rebuild without a secret, the held-out tasks need the line from
+`.secops-gym-heldout-secret` (leave that line out to check only the rest):
+
+```bash
+docker compose -f runtime/docker-compose.yml up -d --wait
+uv run --no-sync python -m factory.generate --count 3 --seed 1 --secret "" --out tasks_generated
+GYM_FACTORY_SECRET=<secret> uv run --no-sync python -m factory.generate --count 3 --out tasks_private
+uv run --no-sync python -m train.rescore results/train
+```
+
+It scores every distinct answer again in the warm sandbox and writes `results/train/rescore.md`.
+**Inflated** answers (recorded higher during training than in isolation) would mean the policy
+learned a trick that works only in local mode; none means the local-mode numbers stand.

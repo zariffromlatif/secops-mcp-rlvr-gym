@@ -22,8 +22,10 @@ Stages, in order:
 Without --deadline it runs until the last milestone is evaluated. Stopped for any reason (Ctrl+C,
 a reboot, a crash), the same command continues from the last checkpoint.
 
-Works on Linux and on Windows without WSL (with Docker Desktop for the warm sandbox, or any
-Postgres for local mode). What is done is in <out>/state.json, the full output in <out>/campaign.log.
+Works on Linux and on Windows without WSL or admin rights: Docker Desktop for the warm sandbox, or
+any Postgres for local mode (then check the answers afterwards with train.rescore on a machine with
+Docker). On Windows it keeps the PC from sleeping while it runs. What is done is in
+<out>/state.json, the full output in <out>/campaign.log.
 """
 
 from __future__ import annotations
@@ -43,6 +45,19 @@ from train.grpo import parse_deadline
 ROOT = Path(__file__).resolve().parents[1]
 TRAIN_TASKS = ["tasks", "tasks_generated"]
 HELDOUT = "tasks_private"
+
+
+def keep_awake() -> None:
+    """On Windows, keep the PC from going to sleep while this process runs (needs no admin rights)."""
+    if sys.platform == "win32":
+        import ctypes
+
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+
+
+def docker_runs() -> bool:
+    """A Docker engine answers. False, not an error, when Docker is not installed at all."""
+    return shutil.which("docker") is not None and subprocess.run(["docker", "info"], capture_output=True).returncode == 0
 
 
 class Campaign:
@@ -119,8 +134,8 @@ class Campaign:
 
         candidates = ["warm", "local"] if self.args.sandbox == "auto" else [self.args.sandbox]
         for sandbox in candidates:
-            if sandbox == "warm" and subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
-                self.log("Docker is not running: no warm sandbox")
+            if sandbox == "warm" and not docker_runs():
+                self.log("Docker is not installed or not running: no warm sandbox")
                 continue
             self.log(f"checking the scorer with --sandbox {sandbox}: gold must be solved, buggy code not")
             if self.python("-m", "train.grpo", "--dry-run", "--sandbox", sandbox, "--workers", str(self.args.workers),
@@ -129,7 +144,8 @@ class Campaign:
                 self.state.setdefault("sandboxes", []).append({"at": time.strftime("%Y-%m-%d %H:%M"), "sandbox": sandbox})
                 self.save()
                 self.log(f"scorer: {sandbox}" + ("" if sandbox == "warm" else
-                         " (not isolated: in-process tricks could pay off; say so when reporting)"))
+                         " (not isolated: in-process tricks could pay off; re-score the answers with "
+                         "train.rescore on a machine with Docker before reporting)"))
                 return
         self.fail("no working scorer. Start Docker Desktop (warm sandbox), or run a Postgres and set DATABASE_URL "
                   "(local mode); see docs/bracu-pc.md")
@@ -228,6 +244,9 @@ class Campaign:
                  f"Scorer: {', '.join(sorted({s['sandbox'] for s in self.state.get('sandboxes', [])}))}.\n\n"
                  "| model | steps | tasks | v1 | v2 | v3 | solved (pass@1) | any solved (pass@k) |\n"
                  "|---|---:|---|---:|---:|---:|---:|---:|\n" + "\n".join(rows) + "\n")
+        if any(s["sandbox"] == "local" for s in self.state.get("sandboxes", [])):
+            text += ("\nScored in local mode, which is not isolated: check every answer in the warm sandbox with "
+                     "`python -m train.rescore` (on a machine with Docker) before relying on these numbers.\n")
         (self.out / "README.md").write_text(text)
         self.log(f"report: {self.out / 'README.md'}")
 
@@ -297,6 +316,7 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if shutil.which("git") is None:
         raise SystemExit("git is needed (patches are applied with git apply)")
+    keep_awake()
     Campaign(args).go()
 
 

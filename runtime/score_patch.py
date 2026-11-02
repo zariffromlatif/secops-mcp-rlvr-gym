@@ -96,7 +96,7 @@ def score_patch(task_dir: Path, patch: Path, sandbox: str = "local") -> RewardBr
     spec["security"] = spec.get("security") or spec["target"]
     editable = tuple(task.get("editable_paths") or ["app/"])
     TMP_ROOT.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="gym-", dir=TMP_ROOT) as tmp:
+    with tempfile.TemporaryDirectory(prefix="gym-", dir=TMP_ROOT, ignore_cleanup_errors=True) as tmp:
         workdir = Path(tmp)
         prepare_workdir(task_dir, workdir)
 
